@@ -26,7 +26,9 @@ import GHC.Generics
 import Prelude hiding (FilePath)
 import Shelly as Sh
 
+import qualified Data.Aeson             as A
 import qualified Data.ByteString.Base64 as B64
+import qualified Data.ByteString.Lazy   as BZ
 import qualified Data.Map.Strict        as M
 import qualified Data.Text.Encoding     as T
 
@@ -209,14 +211,14 @@ instance ToJSON TemplateFile where
     ]
 
 -- | Load all external references of template into memory
-loadTemplateInMemory :: TemplateFile -> Sh (Either ParseException Template)
+loadTemplateInMemory :: TemplateFile -> Sh (Either String Template)
 loadTemplateInMemory TemplateFile{..} = do
   inputCnt <- readBinary templateFileInput
   body <- readfile templateFileBody
   deps <- traverse loadDep templateFileDeps
   return $ Template
     <$> pure templateFileName
-    <*> decodeEither' inputCnt
+    <*> A.eitherDecode' (BZ.fromStrict inputCnt)
     <*> pure body
     <*> sequence deps
     <*> pure templateFileHaskintexOpts
@@ -239,7 +241,7 @@ loadTemplateInMemory TemplateFile{..} = do
 storeTemplateInFiles :: Template -> FilePath -> Sh TemplateFile
 storeTemplateInFiles Template{..} folder = do
   let inputName = folder </> (templateName <> "_input") <.> "json"
-  writeBinary inputName $ encode templateInput
+  writeBinary inputName $ BZ.toStrict $ A.encode templateInput
   let bodyName = folder </> templateName <.> "htex"
   mkdir_p $ directory bodyName
   writefile bodyName templateBody
