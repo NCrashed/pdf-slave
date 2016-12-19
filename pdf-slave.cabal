@@ -65,4 +65,5 @@ executable pdf-slave
     , text                    >= 1.2      && < 1.3
     , yaml                    >= 0.8      && < 0.9
   default-extensions:
+    OverloadedStrings
     RecordWildCards
