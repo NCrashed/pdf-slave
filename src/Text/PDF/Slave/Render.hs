@@ -12,6 +12,7 @@ module Text.PDF.Slave.Render(
 
 import Data.ByteString (ByteString)
 import Data.Set (Set)
+import Filesystem.Path (dropExtension)
 import GHC.Generics
 import Prelude hiding (FilePath)
 import Shelly
@@ -43,14 +44,15 @@ renderPdfTemplate t@TemplateFile{..} baseDir outputFolder = do
   let pdflatex = bash "pdflatex" [
           "-synctex=1"
         , "-interaction=nonstopmode"
-        , toTextArg $ outputFolder </> templateFileName <.> "tex" ]
+        , toTextArg $ templateFileName <.> "tex" ]
       bibtex = bash "bibtex" [
-          toTextArg $ outputFolder </> templateFileName <.> "aux" ]
+          toTextArg $ templateFileName <.> "aux" ]
   -- read flags and construct pipe
-  _ <- if S.member NeedBibtex flags
-    then pdflatex -|- bibtex -|- pdflatex
-    else pdflatex
-  return ()
+  chdir outputFolder $ do
+    _ <- if S.member NeedBibtex flags
+      then pdflatex -|- bibtex -|- pdflatex
+      else pdflatex
+    return ()
 
 -- | Low-level render of template from .htex to .tex that is recursively used for dependencies
 renderTemplate :: TemplateFile -- ^ Template to render
@@ -59,7 +61,13 @@ renderTemplate :: TemplateFile -- ^ Template to render
   -> Sh DepFlags -- ^ Flags that affects compilation upper in the deptree
 renderTemplate TemplateFile{..} baseDir outputFolder = do
   depFlags <- traverse (renderTemplateDep baseDir outputFolder) templateFileDeps
-  _ <- bash "haskintex" [toTextArg $ baseDir </> templateFileBody]
+  let haskintex = bash "haskintex" $ [
+          "-stdout"
+        , toTextArg $ baseDir </> dropExtension templateFileBody ]
+        ++ templateFileHaskintexOpts
+      outputPath = outputFolder </> templateFileName <.> "tex"
+  texFile <- haskintex
+  writefile outputPath texFile
   return $ F.foldMap id depFlags -- merge flags
 
 -- | Collected dependency markers (for instance, that we need bibtex compilation)

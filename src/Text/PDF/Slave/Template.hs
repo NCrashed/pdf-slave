@@ -97,13 +97,15 @@ instance ToJSON TemplateDependency where
 -- | Description of document template
 data Template = Template {
   -- | Template has human readable name
-    templateName      :: TemplateName
+    templateName          :: TemplateName
   -- | Template expects input in YAML format
-  , templateInput     :: TemplateInput
+  , templateInput         :: TemplateInput
   -- | Template contents
-  , templateBody      :: TemplateBody
+  , templateBody          :: TemplateBody
   -- | Template dependencies (bibtex, listings, other htex files)
-  , templateDeps      :: M.Map TemplateName TemplateDependency
+  , templateDeps          :: M.Map TemplateName TemplateDependency
+  -- | Additional flags for `haskintex`
+  , templateHaskintexOpts :: [Text]
   } deriving (Generic, Show)
 
 instance FromJSON Template where
@@ -111,15 +113,17 @@ instance FromJSON Template where
     <$> o .: "name"
     <*> o .: "input"
     <*> o .: "body"
-    <*> o .: "dependencies"
+    <*> o .:? "dependencies" .!= mempty
+    <*> o .:? "haskintex-opts" .!= mempty
   parseJSON _ = mzero
 
 instance ToJSON Template where
   toJSON Template{..} = object [
-      "name"         .= templateName
-    , "input"        .= templateInput
-    , "body"         .= templateBody
-    , "dependencies" .= templateDeps
+      "name"           .= templateName
+    , "input"          .= templateInput
+    , "body"           .= templateBody
+    , "dependencies"   .= templateDeps
+    , "haskintex-opts" .= templateHaskintexOpts
     ]
 
 -- | Same as 'TemplateDependency' but keeps contents in separate files
@@ -182,6 +186,8 @@ data TemplateFile = TemplateFile {
   , templateFileBody      :: FilePath
   -- | Template dependencies (bibtex, listings, other htex files)
   , templateFileDeps      :: M.Map TemplateName TemplateDependencyFile
+  -- | Additional flags for `haskintex`
+  , templateFileHaskintexOpts :: [Text]
   } deriving (Generic, Show)
 
 instance FromJSON TemplateFile where
@@ -189,15 +195,17 @@ instance FromJSON TemplateFile where
     <$> o .: "name"
     <*> o .: "input"
     <*> o .: "body"
-    <*> o .: "dependencies"
+    <*> o .:? "dependencies" .!= mempty
+    <*> o .:? "haskintex-opts" .!= mempty
   parseJSON _ = mzero
 
 instance ToJSON TemplateFile where
   toJSON TemplateFile{..} = object [
-      "name"         .= templateFileName
-    , "input"        .= templateFileInput
-    , "body"         .= templateFileBody
-    , "dependencies" .= templateFileDeps
+      "name"           .= templateFileName
+    , "input"          .= templateFileInput
+    , "body"           .= templateFileBody
+    , "dependencies"   .= templateFileDeps
+    , "haskintex-opts" .= templateFileHaskintexOpts
     ]
 
 -- | Load all external references of template into memory
@@ -211,6 +219,7 @@ loadTemplateInMemory TemplateFile{..} = do
     <*> decodeEither' inputCnt
     <*> pure body
     <*> sequence deps
+    <*> pure templateFileHaskintexOpts
   where
     loadDep d = case d of
       BibtexDepFile body -> do
@@ -240,6 +249,7 @@ storeTemplateInFiles Template{..} folder = do
     , templateFileInput = inputName
     , templateFileBody = bodyName
     , templateFileDeps = deps
+    , templateFileHaskintexOpts = templateHaskintexOpts
     }
   where
     storeDep name d = case d of

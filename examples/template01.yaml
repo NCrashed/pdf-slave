@@ -1,0 +1,4 @@
+name:  template01
+input: template01_input.yaml
+body:  template01.htex
+dependencies: {}
