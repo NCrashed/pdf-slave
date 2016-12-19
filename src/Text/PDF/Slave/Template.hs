@@ -238,7 +238,7 @@ loadTemplateInMemory TemplateFile{..} = do
 -- | Extract all external references of template into file system
 storeTemplateInFiles :: Template -> FilePath -> Sh TemplateFile
 storeTemplateInFiles Template{..} folder = do
-  let inputName = folder </> (templateName <> "_input") <.> "yaml"
+  let inputName = folder </> (templateName <> "_input") <.> "json"
   writeBinary inputName $ encode templateInput
   let bodyName = folder </> templateName <.> "htex"
   mkdir_p $ directory bodyName

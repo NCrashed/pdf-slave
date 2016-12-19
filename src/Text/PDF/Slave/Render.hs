@@ -61,13 +61,21 @@ renderTemplate :: TemplateFile -- ^ Template to render
   -> Sh DepFlags -- ^ Flags that affects compilation upper in the deptree
 renderTemplate TemplateFile{..} baseDir outputFolder = do
   depFlags <- traverse (renderTemplateDep baseDir outputFolder) templateFileDeps
-  let haskintex = bash "haskintex" $ [
-          "-stdout"
-        , toTextArg $ baseDir </> dropExtension templateFileBody ]
+  let
+      bodyName = dropExtension templateFileBody
+      haskintex = bash "haskintex" $ [
+          "-overwrite"
+        , "-verbose"
+        , "-stackdb"
+        , toTextArg $ baseDir </> bodyName ]
         ++ templateFileHaskintexOpts
-      outputPath = outputFolder </> templateFileName <.> "tex"
-  texFile <- haskintex
-  writefile outputPath texFile
+      texPath = baseDir </> bodyName <.> "tex"
+      outputPath = outputFolder </> bodyName <.> "tex"
+      inputPath = baseDir </> templateFileInput
+  cp inputPath $ outputFolder </> templateFileInput
+  _ <- haskintex
+  cp texPath outputPath
+  rm texPath
   return $ F.foldMap id depFlags -- merge flags
 
 -- | Collected dependency markers (for instance, that we need bibtex compilation)
