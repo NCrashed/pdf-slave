@@ -238,18 +238,21 @@ loadTemplateInMemory TemplateFile{..} = do
         return . pure $ OtherDep cnt
 
 -- | Extract all external references of template into file system
-storeTemplateInFiles :: Template -> FilePath -> Sh TemplateFile
-storeTemplateInFiles Template{..} folder = do
+storeTemplateInFiles :: Template -> FilePath -> FilePath -> Sh TemplateFile
+storeTemplateInFiles Template{..} baseDir folder = do
+  mkdir_p folder
   let inputName = folder </> (templateName <> "_input") <.> "json"
   writeBinary inputName $ BZ.toStrict $ A.encode templateInput
+  relInputName <- relativeTo baseDir inputName
   let bodyName = folder </> templateName <.> "htex"
   mkdir_p $ directory bodyName
   writefile bodyName templateBody
+  relBodyName <- relativeTo baseDir bodyName
   deps <- M.traverseWithKey storeDep templateDeps
   return $ TemplateFile {
       templateFileName = templateName
-    , templateFileInput = inputName
-    , templateFileBody = bodyName
+    , templateFileInput = relInputName
+    , templateFileBody = relBodyName
     , templateFileDeps = deps
     , templateFileHaskintexOpts = templateHaskintexOpts
     }
@@ -259,19 +262,21 @@ storeTemplateInFiles Template{..} folder = do
         let bodyName = folder </> name <.> "bib"
         mkdir_p $ directory bodyName
         writefile bodyName body
-        return $ BibtexDepFile bodyName
+        relBodyName <- relativeTo baseDir bodyName
+        return $ BibtexDepFile relBodyName
       TemplateDep template -> do
         let subfolderName = Sh.fromText name
         mkdir_p subfolderName
-        dep <- storeTemplateInFiles template subfolderName
+        dep <- storeTemplateInFiles template baseDir subfolderName
         return $ TemplateDepFile dep
       TemplatePdfDep template -> do
         let subfolderName = Sh.fromText name
         mkdir_p subfolderName
-        dep <- storeTemplateInFiles template subfolderName
+        dep <- storeTemplateInFiles template baseDir subfolderName
         return $ TemplatePdfDepFile dep
       OtherDep body -> do
         let bodyName = folder </> name
         mkdir_p $ directory bodyName
         writeBinary bodyName body
-        return $ OtherDepFile bodyName
+        relBodyName <- relativeTo baseDir bodyName
+        return $ OtherDepFile relBodyName

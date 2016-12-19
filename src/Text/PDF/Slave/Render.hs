@@ -72,6 +72,9 @@ renderTemplate TemplateFile{..} baseDir outputFolder = do
       texPath = baseDir </> bodyName <.> "tex"
       outputPath = outputFolder </> bodyName <.> "tex"
       inputPath = baseDir </> templateFileInput
+  echo (toTextIgnore inputPath)
+  echo (toTextIgnore templateFileInput)
+  echo (toTextIgnore $ outputFolder </> templateFileInput)
   cp inputPath $ outputFolder </> templateFileInput
   _ <- haskintex
   cp texPath outputPath

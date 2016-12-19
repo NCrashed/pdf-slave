@@ -75,7 +75,7 @@ pdfSlave Options{..} = shelly $ do
   -- define base directory
   baseDir <- case templatePath of
     Nothing -> pwd
-    Just p -> pure $ directory p
+    Just p -> canonic $ directory p
   -- read template
   templateContent <- case templatePath of
     Nothing -> liftIO $ BS.getContents
@@ -94,7 +94,7 @@ pdfSlave Options{..} = shelly $ do
         Bundle -> case decodeEither' templateContent of
           Left e -> fail $ "Failed to parse template: " <> show e
           Right t -> withTmpDir $ \folder -> do
-            tf <- storeTemplateInFiles t folder
+            tf <- storeTemplateInFiles t folder folder
             render tf
         Files -> case decodeEither' templateContent of
           Left e -> fail $ "Failed to parse template: " <> show e
@@ -119,7 +119,7 @@ pdfSlave Options{..} = shelly $ do
         Nothing -> fail "Expecting --output parameter as destination folder"
         Just outputFolder -> do
           mkdir_p outputFolder
-          tf <- storeTemplateInFiles t outputFolder
+          tf <- storeTemplateInFiles t outputFolder outputFolder
           let templateFilename = outputFolder </> templateName t <.> "yaml"
           writeBinary templateFilename $ encode tf
           outputFolder' <- toTextWarn outputFolder
