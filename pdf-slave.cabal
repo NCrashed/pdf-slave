@@ -57,4 +57,12 @@ executable pdf-slave
   default-language:    Haskell2010
   build-depends:
       base                    >= 4.7      && < 5
+    , bytestring              >= 0.10     && < 0.11
+    , optparse-applicative    >= 0.12     && < 0.13
     , pdf-slave
+    , shelly                  >= 1.6      && < 1.7
+    , system-filepath         >= 0.4      && < 0.5
+    , text                    >= 1.2      && < 1.3
+    , yaml                    >= 0.8      && < 0.9
+  default-extensions:
+    RecordWildCards
