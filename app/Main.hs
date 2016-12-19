@@ -117,8 +117,7 @@ pdfSlave Options{..} = shelly $ do
       Left e -> fail $ "Failed to parse template: " <> show e
       Right t -> case pdfOutputPath of
         Nothing -> fail "Expecting --output parameter as destination folder"
-        Just outputPath -> do
-          let outputFolder = directory outputPath
+        Just outputFolder -> do
           mkdir_p outputFolder
           tf <- storeTemplateInFiles t outputFolder
           let templateFilename = outputFolder </> templateName t <.> "yaml"
