@@ -246,19 +246,19 @@ loadTemplateInMemory TemplateFile{..} = do
           return . pure $ OtherDep cnt
 
 -- | Extract all external references of template into file system
-storeTemplateInFiles :: Template -> FilePath -> FilePath -> Sh TemplateFile
-storeTemplateInFiles Template{..} baseDir folder = do
+storeTemplateInFiles :: Template -> FilePath -> Sh TemplateFile
+storeTemplateInFiles Template{..} folder = do
   mkdir_p folder
   relInputName <- case templateInput of
     Nothing -> return Nothing
     Just input -> do
       let inputName = folder </> (templateName <> "_input") <.> "json"
       writeBinary inputName $ BZ.toStrict $ A.encode input
-      fmap Just $ relativeTo baseDir inputName
+      fmap Just $ relativeTo folder inputName
   let bodyName = folder </> templateName <.> "htex"
   mkdir_p $ directory bodyName
   writefile bodyName templateBody
-  relBodyName <- relativeTo baseDir bodyName
+  relBodyName <- relativeTo folder bodyName
   deps <- M.traverseWithKey storeDep templateDeps
   return $ TemplateFile {
       templateFileName = templateName
@@ -275,12 +275,14 @@ storeTemplateInFiles Template{..} baseDir folder = do
         writefile bodyName body
         return BibtexDepFile
       TemplateDep template -> do
-        mkdir_p folder
-        dep <- storeTemplateInFiles template baseDir folder
+        let subfolderName = folder </> Sh.fromText name
+        mkdir_p subfolderName
+        dep <- storeTemplateInFiles template subfolderName
         return $ TemplateDepFile dep
       TemplatePdfDep template -> do
-        mkdir_p folder
-        dep <- storeTemplateInFiles template baseDir folder
+        let subfolderName = folder </> Sh.fromText name
+        mkdir_p subfolderName
+        dep <- storeTemplateInFiles template subfolderName
         return $ TemplatePdfDepFile dep
       OtherDep body -> do
         let bodyName = folder </> name
