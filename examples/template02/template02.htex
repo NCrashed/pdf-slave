@@ -1,0 +1,25 @@
+\documentclass{article}
+\usepackage{graphicx}
+\usepackage[utf8]{inputenc}
+\usepackage{listings}
+
+\title{Static dependencies}
+\author{Anton Gushcha}
+
+\begin{document}
+
+\maketitle
+
+\begin{figure}[t]
+\caption{Cute lambda}
+\centering
+\includegraphics[width=0.5\textwidth]{lambda}
+\end{figure}
+
+\begin{figure}[t]
+\caption{Demo listing}
+\centering
+\lstinputlisting[language=Haskell]{code/demo.hs}
+\end{figure}
+
+\end{document}

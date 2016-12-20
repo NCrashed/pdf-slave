@@ -12,12 +12,13 @@ module Text.PDF.Slave.Render(
 
 import Data.ByteString (ByteString)
 import Data.Set (Set)
-import Filesystem.Path (dropExtension)
+import Filesystem.Path (dropExtension, directory)
 import GHC.Generics
 import Prelude hiding (FilePath)
 import Shelly
 
 import qualified Data.Foldable as F
+import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 
 import Text.PDF.Slave.Template
@@ -60,7 +61,7 @@ renderTemplate :: TemplateFile -- ^ Template to render
   -> FilePath -- ^ Output folder
   -> Sh DepFlags -- ^ Flags that affects compilation upper in the deptree
 renderTemplate TemplateFile{..} baseDir outputFolder = do
-  depFlags <- traverse (renderTemplateDep baseDir outputFolder) templateFileDeps
+  depFlags <- M.traverseWithKey (renderTemplateDep baseDir outputFolder) templateFileDeps
   let
       bodyName = dropExtension templateFileBody
       haskintex = bash "haskintex" $ [
@@ -83,12 +84,23 @@ data DepFlag = NeedBibtex -- ^ We need a bibtex compliation
 -- | Render template dependency
 renderTemplateDep :: FilePath -- ^ Base directory
   -> FilePath  -- ^ Output folder
+  -> TemplateName -- ^ Dependency name
   -> TemplateDependencyFile -- ^ Dependency type
   -> Sh DepFlags
-renderTemplateDep baseDir outputFolder dep = case dep of
-  BibtexDepFile _ -> return $ S.singleton NeedBibtex
+renderTemplateDep baseDir outputFolder name dep = case dep of
+  BibtexDepFile -> do
+    let file = fromText name
+        outputFile = outputFolder </> file
+    mkdir_p (directory outputFile)
+    cp (baseDir </> file) outputFile
+    return $ S.singleton NeedBibtex
   TemplateDepFile template -> renderTemplate template baseDir outputFolder
   TemplatePdfDepFile template -> do
     renderPdfTemplate template baseDir outputFolder
     return mempty
-  OtherDepFile _ -> return mempty
+  OtherDepFile -> do
+    let file = fromText name
+        outputFile = outputFolder </> file
+    mkdir_p (directory outputFile)
+    cp (baseDir </> file) outputFile
+    return mempty
