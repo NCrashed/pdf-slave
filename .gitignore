@@ -1,4 +1,4 @@
 .stack-work
 pdf-slave.sublime-workspace
-examples/*.pdf
+examples/*/*.pdf
 artifacts

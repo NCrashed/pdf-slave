@@ -1,0 +1,1 @@
+stack exec -- pdf-slave pdf --template template02.yaml --output output.pdf

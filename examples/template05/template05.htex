@@ -1,0 +1,15 @@
+\documentclass{article}
+\usepackage[utf8]{inputenc}
+\usepackage{pdfpages}
+
+\title{Template PDF dependency}
+\author{Anton Gushcha}
+
+\begin{document}
+
+\maketitle
+
+\includepdf[pages={1-}]{template01/template01.pdf}
+\includepdf[pages={1-}]{template02/template02.pdf}
+
+\end{document}

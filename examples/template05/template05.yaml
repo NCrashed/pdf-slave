@@ -1,0 +1,18 @@
+name:  template05
+input: template05_input.json
+body:  template05.htex
+dependencies:
+  template01:
+    type:  template_pdf
+    name:  template01
+    input: template01_input.json
+    body:  template01.htex
+  template02:
+    type:  template_pdf
+    name:  template02
+    body:  template02.htex
+    dependencies:
+      lambda.png:
+        type: other
+      code/demo.hs:
+        type: other

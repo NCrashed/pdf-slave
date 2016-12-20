@@ -1,0 +1,8 @@
+name:  template02
+body:  template02.htex
+dependencies:
+  lambda.png:
+    type: other
+  code/demo.hs:
+    type: other
+haskintex-opts: []
