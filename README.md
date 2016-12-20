@@ -17,5 +17,5 @@ You need  installed and stack:
 ```
 cd examples
 stack install aeson HaTeX
-stack exec -- pdf-slave --template template01.yaml --output pdf.pdf pdf && xdg-open pdf.pdf
+stack exec -- pdf-slave --template template01.yaml --output output.pdf pdf && xdg-open output.pdf
 ```

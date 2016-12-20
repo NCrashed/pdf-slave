@@ -11,3 +11,6 @@ RUN stack install aeson HaTeX
 
 ADD artifacts/haskintex /usr/bin/haskintex
 ADD artifacts/pdf-slave /usr/bin/pdf-slave
+
+ADD Dockerfile.sh Dockerfile.sh
+ENTRYPOINT ["/bin/bash", "./Dockerfile.sh"]
