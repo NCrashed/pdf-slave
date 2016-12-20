@@ -66,14 +66,11 @@ renderTemplate TemplateFile{..} baseDir outputFolder = do
       haskintex = bash "haskintex" $ [
           "-overwrite"
         , "-verbose"
-        , "-stackdb"
         , toTextArg $ baseDir </> bodyName ]
         ++ templateFileHaskintexOpts
       texPath = baseDir </> bodyName <.> "tex"
       outputPath = outputFolder </> bodyName <.> "tex"
       inputPath = baseDir </> templateFileInput
-  echo (toTextIgnore inputPath)
-  echo (toTextIgnore templateFileInput)
   echo (toTextIgnore $ outputFolder </> templateFileInput)
   cp inputPath $ outputFolder </> templateFileInput
   _ <- haskintex

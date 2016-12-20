@@ -1,0 +1,21 @@
+FROM debian:jessie
+
+RUN apt-get update
+RUN apt-get install wget -y
+RUN wget -qO- https://get.haskellstack.org/ | sh
+
+RUN echo 'export PATH=/root/.local/bin:$PATH\n' >> /root/.bashrc
+
+RUN stack setup 8.0.1
+
+ADD Setup.hs Setup.hs
+ADD stack.yaml stack.yaml
+ADD pdf-slave.cabal pdf-slave.cabal
+ADD LICENSE LICENSE
+ADD CHANGELOG.md CHANGELOG.md
+ADD app app
+ADD src src
+ADD README.md README.md
+
+ADD Dockerfile_build.sh Dockerfile_build.sh
+ENTRYPOINT ./Dockerfile_build.sh
