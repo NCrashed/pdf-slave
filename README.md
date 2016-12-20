@@ -165,4 +165,4 @@ docker run -it --rm -v $(pwd)/examples:/data/examples pdf-slave pdf --template e
 xdg-open examples/output.pdf
 ```
 
-3. TODO: Upload to docker hub
+3. Or download [precompiled container](https://hub.docker.com/r/ncrashed/pdf-slave/) from Docker Hub.
