@@ -1,0 +1,9 @@
+{
+  "dep1": {
+    "line-width": 2,
+    "spiral-precision": 0.01,
+    "spiral-interval": [0,4],
+    "spiral-a": 0.1,
+    "spiral-b": 4
+  }
+}

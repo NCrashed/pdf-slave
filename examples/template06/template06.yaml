@@ -1,0 +1,8 @@
+name:  template06
+input: template06_input.json
+body:  template06.htex
+dependencies:
+  dep1:
+    type:  template
+    name:  dep1
+    body:  dep1.htex

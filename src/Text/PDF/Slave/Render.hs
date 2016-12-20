@@ -10,14 +10,20 @@ module Text.PDF.Slave.Render(
   , renderTemplateDep
   ) where
 
+import Control.Monad (join)
+import Data.Aeson (Value(..))
 import Data.ByteString (ByteString)
+import Data.Monoid
 import Data.Set (Set)
 import Filesystem.Path (dropExtension, directory)
 import GHC.Generics
 import Prelude hiding (FilePath)
 import Shelly
 
+import qualified Data.Aeson as A
+import qualified Data.ByteString.Lazy as BZ
 import qualified Data.Foldable as F
+import qualified Data.HashMap.Strict as H
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 
@@ -31,16 +37,25 @@ renderTemplateToPDF :: TemplateFile -- ^ Input template
   -> FilePath -- ^ Base directory
   -> Sh PDFContent -- ^ Output PDF file
 renderTemplateToPDF t@TemplateFile{..} baseDir = withTmpDir $ \outputFolder -> do
-  renderPdfTemplate t baseDir outputFolder
+  -- Parse global input file and pass it as inherited input
+  minput <- case templateFileInput of
+    Nothing -> return Nothing
+    Just inputName -> do
+      cnt <- readBinary inputName
+      case A.eitherDecode' . BZ.fromStrict $ cnt of
+        Left e -> fail $ "Cannot decode input file: " <> show e
+        Right a -> return $ Just a
+  renderPdfTemplate minput t baseDir outputFolder
   readBinary (outputFolder </> templateFileName <.> "pdf")
 
 -- | Low-level render of template from .htex to .pdf that is recursively used for dependencies
-renderPdfTemplate :: TemplateFile -- ^ Template to render
+renderPdfTemplate :: Maybe Value -- ^ Inherited input from parent
+  -> TemplateFile -- ^ Template to render
   -> FilePath -- ^ Base directory
   -> FilePath -- ^ Output folder
   -> Sh ()
-renderPdfTemplate t@TemplateFile{..} baseDir outputFolder = do
-  flags <- renderTemplate t baseDir outputFolder
+renderPdfTemplate minput t@TemplateFile{..} baseDir outputFolder = do
+  flags <- renderTemplate minput t baseDir outputFolder
   -- define commands of compilation pipe
   let pdflatex = bash "pdflatex" [
           "-synctex=1"
@@ -56,13 +71,15 @@ renderPdfTemplate t@TemplateFile{..} baseDir outputFolder = do
     return ()
 
 -- | Low-level render of template from .htex to .tex that is recursively used for dependencies
-renderTemplate :: TemplateFile -- ^ Template to render
+renderTemplate :: Maybe Value -- ^ Inherited input from parent
+  -> TemplateFile -- ^ Template to render
   -> FilePath -- ^ Base directory
   -> FilePath -- ^ Output folder
   -> Sh DepFlags -- ^ Flags that affects compilation upper in the deptree
-renderTemplate TemplateFile{..} baseDir outputFolder = do
+renderTemplate minput TemplateFile{..} baseDir outputFolder = do
   mkdir_p outputFolder
-  depFlags <- M.traverseWithKey (renderTemplateDep baseDir outputFolder) templateFileDeps
+  let renderDepenency = renderTemplateDep minput baseDir outputFolder
+  depFlags <- M.traverseWithKey renderDepenency templateFileDeps
   let
       bodyName = dropExtension templateFileBody
       haskintex = bash "haskintex" $ [
@@ -70,10 +87,14 @@ renderTemplate TemplateFile{..} baseDir outputFolder = do
         , "-verbose"
         , toTextArg $ baseDir </> bodyName ]
         ++ templateFileHaskintexOpts
-  -- input file might be missing
-  whenJust templateFileInput $ \inputName -> do
-    let inputPath = baseDir </> inputName
-    cp inputPath $ outputFolder </> inputName
+  -- input file might be missing, if missing we can inject input from parent
+  case templateFileInput of
+    Nothing -> whenJust minput $ \input -> do
+      let filename = outputFolder </> (templateFileName <> "_input") <.> "json"
+      writeBinary filename $ BZ.toStrict . A.encode $ input
+    Just inputName -> do
+      let inputPath = baseDir </> inputName
+      cp inputPath $ outputFolder </> inputName
   _ <- chdir outputFolder haskintex
   return $ F.foldMap id depFlags -- merge flags
 
@@ -85,12 +106,13 @@ data DepFlag = NeedBibtex -- ^ We need a bibtex compliation
   deriving (Generic, Show, Ord, Eq)
 
 -- | Render template dependency
-renderTemplateDep :: FilePath -- ^ Base directory
+renderTemplateDep :: Maybe Value -- ^ Inherited input from parent
+  -> FilePath -- ^ Base directory
   -> FilePath  -- ^ Output folder
   -> TemplateName -- ^ Dependency name
   -> TemplateDependencyFile -- ^ Dependency type
   -> Sh DepFlags
-renderTemplateDep baseDir outputFolder name dep = case dep of
+renderTemplateDep minput baseDir outputFolder name dep = case dep of
   BibtexDepFile -> do
     let file = fromText name
         outputFile = outputFolder </> file
@@ -100,11 +122,11 @@ renderTemplateDep baseDir outputFolder name dep = case dep of
   TemplateDepFile template -> do
     let subFolder = baseDir </> fromText name
         outputSubFolder = outputFolder </> fromText name
-    renderTemplate template subFolder outputSubFolder
+    renderTemplate minput' template subFolder outputSubFolder
   TemplatePdfDepFile template -> do
     let subFolder = baseDir </> fromText name
         outputSubFolder = outputFolder </> fromText name
-    renderPdfTemplate template subFolder outputSubFolder
+    renderPdfTemplate minput' template subFolder outputSubFolder
     return mempty
   OtherDepFile -> do
     let file = fromText name
@@ -112,6 +134,12 @@ renderTemplateDep baseDir outputFolder name dep = case dep of
     mkdir_p (directory outputFile)
     cp (baseDir </> file) outputFile
     return mempty
+  where
+    -- Try to find subsection in input that refer to the dependency
+    minput' :: Maybe Value
+    minput' = join $ flip fmap minput $ \case
+      Object o -> H.lookup name o
+      _ -> Nothing
 
 -- | Same as 'when', but for 'Just' values.
 whenJust :: Applicative f => Maybe a -> (a -> f ()) -> f ()

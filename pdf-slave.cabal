@@ -34,6 +34,7 @@ library
     , shelly                   >= 1.6      && < 1.7
     , system-filepath          >= 0.4      && < 0.5
     , text                     >= 1.2      && < 1.3
+    , unordered-containers     >= 0.2      && < 0.3
     , yaml                     >= 0.8      && < 0.9
 
   default-extensions:
@@ -44,6 +45,7 @@ library
     FunctionalDependencies
     GADTs
     GeneralizedNewtypeDeriving
+    LambdaCase
     MultiParamTypeClasses
     OverloadedStrings
     RecordWildCards

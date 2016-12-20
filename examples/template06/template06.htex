@@ -1,0 +1,16 @@
+\documentclass{article}
+\usepackage{graphicx}
+\usepackage[utf8]{inputenc}
+\usepackage{listings}
+\usepackage{tikz}
+
+\title{Template dependency}
+\author{Anton Gushcha}
+
+\begin{document}
+
+\maketitle
+
+\input{dep1/dep1.tex}
+
+\end{document}
