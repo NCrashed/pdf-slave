@@ -92,7 +92,7 @@ One can pack all `.htex`, `.json`, `.yaml` and all dependencies in single YAML
 bundle that can be easily distributed, transmitted between services and stored:
 
 ``` bash
-cd examples
+cd examples/template01
 pdf-slave --template template01.yaml --output template01_bundle.yaml pack
 ```
 
@@ -140,14 +140,14 @@ You need:
 
 Stack users:
 ``` bash
-cd examples
+cd examples/template01
 stack install aeson HaTeX
 stack exec -- pdf-slave --template template01.yaml --output output.pdf pdf && xdg-open output.pdf
 ```
 
 Cabal users:
 ``` bash
-cd examples
+cd examples/template01
 cabal sandbox init
 cabal install aeson HaTeX
 pdf-slave --template template01.yaml --output output.pdf pdf && xdg-open output.pdf
@@ -161,8 +161,8 @@ Docker build
 2. Usage:
 
   ``` bash
-  docker run -it --rm -v $(pwd)/examples:/data/examples pdf-slave pdf --template examples/template01.yaml --output examples/output.pdf
-  xdg-open examples/output.pdf
+  docker run -it --rm -v $(pwd)/examples/template01:/data/examples pdf-slave pdf --template examples/template01.yaml --output examples/output.pdf
+  xdg-open examples/template01/output.pdf
   ```
 
 3. Or download [precompiled container](https://hub.docker.com/r/ncrashed/pdf-slave/) from Docker Hub.
