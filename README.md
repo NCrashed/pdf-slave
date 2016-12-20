@@ -91,14 +91,14 @@ TODO: describe dependency tree format
 One can pack all `.htex`, `.json`, `.yaml` and all dependencies in single YAML
 bundle that can be easily distributed, transmitted between services and stored:
 
-```
+``` bash
 cd examples
 pdf-slave --template template01.yaml --output template01_bundle.yaml pack
 ```
 
 As modification of such bundles isn't handy, one can unpack bundle:
 
-```
+``` bash
 pdf-slave --template template01_bundle.yaml --output template01_directory unpack
 ```
 
@@ -112,14 +112,14 @@ You need:
 * [stack](https://docs.haskellstack.org/en/stable/README/) or system wide GHC 8.0.1 + Cabal 1.24.0.
 
 Compilation with stack:
-```
+``` bash
 git clone https://github.com/NCrashed/pdf-slave.git
 cd pdf-slave
 stack install
 ```
 
 Compilation with cabal:
-```
+``` bash
 git clone https://github.com/NCrashed/pdf-slave.git
 cd pdf-slave
 cabal sandbox init
@@ -139,14 +139,14 @@ You need:
 * `pdf-slave` and `haskintex` executables in PATH
 
 Stack users:
-```
+``` bash
 cd examples
 stack install aeson HaTeX
 stack exec -- pdf-slave --template template01.yaml --output output.pdf pdf && xdg-open output.pdf
 ```
 
 Cabal users:
-```
+``` bash
 cd examples
 cabal sandbox init
 cabal install aeson HaTeX
@@ -160,9 +160,9 @@ Docker build
 
 2. Usage:
 
-```
-docker run -it --rm -v $(pwd)/examples:/data/examples pdf-slave pdf --template examples/template01.yaml --output examples/output.pdf
-xdg-open examples/output.pdf
-```
+  ``` bash
+  docker run -it --rm -v $(pwd)/examples:/data/examples pdf-slave pdf --template examples/template01.yaml --output examples/output.pdf
+  xdg-open examples/output.pdf
+  ```
 
 3. Or download [precompiled container](https://hub.docker.com/r/ncrashed/pdf-slave/) from Docker Hub.
