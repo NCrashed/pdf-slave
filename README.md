@@ -86,6 +86,22 @@ haskintex-opts: []            # additional flags to haskintex
 
 TODO: describe dependency tree format
 
+## Making bundles
+
+One can pack all `.htex`, `.json`, `.yaml` and all dependencies in single YAML
+bundle that can be easily distributed, transmitted between services and stored:
+
+```
+cd examples
+pdf-slave --template template01.yaml --output template01_bundle.yaml pack
+```
+
+As modification of such bundles isn't handy, one can unpack bundle:
+
+```
+pdf-slave --template template01_bundle.yaml --output template01_directory unpack
+```
+
 Compilation
 ===========
 
