@@ -70,8 +70,10 @@ renderTemplate TemplateFile{..} baseDir outputFolder = do
         , "-verbose"
         , toTextArg $ baseDir </> bodyName ]
         ++ templateFileHaskintexOpts
-      inputPath = baseDir </> templateFileInput
-  cp inputPath $ outputFolder </> templateFileInput
+  -- input file might be missing
+  whenJust templateFileInput $ \inputName -> do
+    let inputPath = baseDir </> inputName
+    cp inputPath $ outputFolder </> inputName
   _ <- chdir outputFolder haskintex
   return $ F.foldMap id depFlags -- merge flags
 
@@ -110,3 +112,8 @@ renderTemplateDep baseDir outputFolder name dep = case dep of
     mkdir_p (directory outputFile)
     cp (baseDir </> file) outputFile
     return mempty
+
+-- | Same as 'when', but for 'Just' values.
+whenJust :: Applicative f => Maybe a -> (a -> f ()) -> f ()
+whenJust Nothing _ = pure ()
+whenJust (Just a) f = f a

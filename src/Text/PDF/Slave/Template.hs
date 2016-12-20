@@ -101,7 +101,7 @@ data Template = Template {
   -- | Template has human readable name
     templateName          :: TemplateName
   -- | Template expects input in YAML format
-  , templateInput         :: TemplateInput
+  , templateInput         :: Maybe TemplateInput
   -- | Template contents
   , templateBody          :: TemplateBody
   -- | Template dependencies (bibtex, listings, other htex files)
@@ -113,7 +113,7 @@ data Template = Template {
 instance FromJSON Template where
   parseJSON (Object o) = Template
     <$> o .: "name"
-    <*> o .: "input"
+    <*> o .:? "input"
     <*> o .: "body"
     <*> o .:? "dependencies" .!= mempty
     <*> o .:? "haskintex-opts" .!= mempty
@@ -184,8 +184,8 @@ instance ToJSON TemplateDependencyFile where
 data TemplateFile = TemplateFile {
   -- | Template has human readable name
     templateFileName      :: TemplateName
-  -- | Template expects input in YAML format. The field contains filename of the YAML file.
-  , templateFileInput     :: FilePath
+  -- | Template expects input in JSON format. The field contains filename of the YAML file.
+  , templateFileInput     :: Maybe FilePath
   -- | Template contents filename.
   , templateFileBody      :: FilePath
   -- | Template dependencies (bibtex, listings, other htex files)
@@ -197,7 +197,7 @@ data TemplateFile = TemplateFile {
 instance FromJSON TemplateFile where
   parseJSON (Object o) = TemplateFile
     <$> o .: "name"
-    <*> o .: "input"
+    <*> o .:? "input"
     <*> o .: "body"
     <*> o .:? "dependencies" .!= mempty
     <*> o .:? "haskintex-opts" .!= mempty
@@ -215,12 +215,16 @@ instance ToJSON TemplateFile where
 -- | Load all external references of template into memory
 loadTemplateInMemory :: TemplateFile -> Sh (Either String Template)
 loadTemplateInMemory TemplateFile{..} = do
-  inputCnt <- readBinary templateFileInput
+  inputCnt <- case templateFileInput of
+    Nothing -> return $ Right Nothing
+    Just fname -> do
+      cnt <- readBinary fname
+      return $ fmap Just . A.eitherDecode' . BZ.fromStrict $ cnt
   body <- readfile templateFileBody
   deps <- M.traverseWithKey loadDep templateFileDeps
   return $ Template
     <$> pure templateFileName
-    <*> A.eitherDecode' (BZ.fromStrict inputCnt)
+    <*> inputCnt
     <*> pure body
     <*> sequence deps
     <*> pure templateFileHaskintexOpts
@@ -245,9 +249,12 @@ loadTemplateInMemory TemplateFile{..} = do
 storeTemplateInFiles :: Template -> FilePath -> FilePath -> Sh TemplateFile
 storeTemplateInFiles Template{..} baseDir folder = do
   mkdir_p folder
-  let inputName = folder </> (templateName <> "_input") <.> "json"
-  writeBinary inputName $ BZ.toStrict $ A.encode templateInput
-  relInputName <- relativeTo baseDir inputName
+  relInputName <- case templateInput of
+    Nothing -> return Nothing
+    Just input -> do
+      let inputName = folder </> (templateName <> "_input") <.> "json"
+      writeBinary inputName $ BZ.toStrict $ A.encode input
+      fmap Just $ relativeTo baseDir inputName
   let bodyName = folder </> templateName <.> "htex"
   mkdir_p $ directory bodyName
   writefile bodyName templateBody

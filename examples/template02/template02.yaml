@@ -1,5 +1,4 @@
 name:  template02
-input: template02_input.json
 body:  template02.htex
 dependencies:
   lambda.png:

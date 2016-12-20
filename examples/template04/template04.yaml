@@ -10,7 +10,6 @@ dependencies:
   dep2:
     type:  template
     name:  dep2
-    input: dep2_input.json
     body:  dep2.htex
     dependencies:
       lambda.png:
