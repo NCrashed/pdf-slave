@@ -51,7 +51,7 @@ renderPdfTemplate t@TemplateFile{..} baseDir outputFolder = do
   -- read flags and construct pipe
   chdir outputFolder $ do
     _ <- if S.member NeedBibtex flags
-      then pdflatex -|- bibtex -|- pdflatex
+      then pdflatex -|- bibtex -|- pdflatex -|- pdflatex
       else pdflatex
     return ()
 

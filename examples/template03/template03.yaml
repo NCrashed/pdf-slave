@@ -1,0 +1,7 @@
+name:  template03
+input: template03_input.json
+body:  template03.htex
+dependencies:
+  biblio.bib:
+    type: bibtex
+haskintex-opts: []

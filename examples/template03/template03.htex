@@ -1,0 +1,17 @@
+\documentclass{article}
+\usepackage{graphicx}
+\usepackage[utf8]{inputenc}
+\usepackage{listings}
+
+\title{Bibtex dependency}
+\author{Anton Gushcha}
+
+\begin{document}
+
+\maketitle
+
+Lets cite the \cite{greenwade93}!
+
+\bibliographystyle{plain}
+\bibliography{biblio.bib}
+\end{document}
