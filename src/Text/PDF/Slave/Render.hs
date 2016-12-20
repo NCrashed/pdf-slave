@@ -68,14 +68,9 @@ renderTemplate TemplateFile{..} baseDir outputFolder = do
         , "-verbose"
         , toTextArg $ baseDir </> bodyName ]
         ++ templateFileHaskintexOpts
-      texPath = baseDir </> bodyName <.> "tex"
-      outputPath = outputFolder </> bodyName <.> "tex"
       inputPath = baseDir </> templateFileInput
-  echo (toTextIgnore $ outputFolder </> templateFileInput)
   cp inputPath $ outputFolder </> templateFileInput
-  _ <- haskintex
-  cp texPath outputPath
-  rm texPath
+  _ <- chdir outputFolder haskintex
   return $ F.foldMap id depFlags -- merge flags
 
 -- | Collected dependency markers (for instance, that we need bibtex compilation)
