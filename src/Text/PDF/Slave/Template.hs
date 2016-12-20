@@ -275,14 +275,12 @@ storeTemplateInFiles Template{..} baseDir folder = do
         writefile bodyName body
         return BibtexDepFile
       TemplateDep template -> do
-        let subfolderName = Sh.fromText name
-        mkdir_p subfolderName
-        dep <- storeTemplateInFiles template baseDir subfolderName
+        mkdir_p folder
+        dep <- storeTemplateInFiles template baseDir folder
         return $ TemplateDepFile dep
       TemplatePdfDep template -> do
-        let subfolderName = Sh.fromText name
-        mkdir_p subfolderName
-        dep <- storeTemplateInFiles template baseDir subfolderName
+        mkdir_p folder
+        dep <- storeTemplateInFiles template baseDir folder
         return $ TemplatePdfDepFile dep
       OtherDep body -> do
         let bodyName = folder </> name
