@@ -1,0 +1,11 @@
+\begin{figure}[t]
+\caption{Cute lambda}
+\centering
+\includegraphics[width=0.5\textwidth]{dep2/lambda}
+\end{figure}
+
+\begin{figure}[t]
+\caption{Demo listing}
+\centering
+\lstinputlisting[language=Haskell]{dep2/code/demo.hs}
+\end{figure}

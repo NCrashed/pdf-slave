@@ -64,12 +64,12 @@ data TemplateDependency =
   deriving (Generic, Show)
 
 instance FromJSON TemplateDependency where
-  parseJSON (Object o) = do
+  parseJSON val@(Object o) = do
     depType <- o .: "type"
     case T.toLower . T.strip $ depType of
       "bibtex"       -> BibtexDep       <$> o .: "body"
-      "template"     -> TemplateDep     <$> o .: "body"
-      "template_pdf" -> TemplatePdfDep  <$> o .: "body"
+      "template"     -> TemplateDep     <$> parseJSON val
+      "template_pdf" -> TemplatePdfDep  <$> parseJSON val
       "other"        -> do
         (t :: Text) <- o .: "body"
         either (\e -> fail $ "Cannot decode dependency body (base64): " <> e) (return . OtherDep) $
@@ -83,14 +83,14 @@ instance ToJSON TemplateDependency where
         "type" .= ("bibtex" :: Text)
       , "body" .= body
       ]
-    TemplateDep body -> object [
-        "type" .= ("template" :: Text)
-      , "body" .= body
-      ]
-    TemplatePdfDep body -> object [
-        "type" .= ("template_pdf" :: Text)
-      , "body" .= body
-      ]
+    TemplateDep body -> let
+      Object o1 = object [ "type" .= ("template" :: Text) ]
+      Object o2 = toJSON body
+      in Object (o1 <> o2)
+    TemplatePdfDep body -> let
+      Object o1 = object [ "type" .= ("template_pdf" :: Text) ]
+      Object o2 = toJSON body
+      in Object (o1 <> o2)
     OtherDep bs -> object [
         "type" .= ("other" :: Text)
       , "body" .= (T.decodeUtf8 . B64.encode $ bs)
@@ -134,8 +134,10 @@ data TemplateDependencyFile =
   -- Name of dependency is a filename with contents.
     BibtexDepFile
   -- | HTex file that need to be compiled to .tex file
+  -- Name of dependency defines a subfolder for the template.
   | TemplateDepFile TemplateFile
   -- | HTex file that need to be compiled to .pdf file
+  -- Name of dependency deinfes a subfolder for the template.
   | TemplatePdfDepFile TemplateFile
   -- | Any other file that doesn't need a compilation (listings, images, etc)
   -- Name of dependency is a filename with contents.
@@ -150,12 +152,12 @@ instance ToJSON FilePath where
   toJSON = String . Sh.toTextIgnore
 
 instance FromJSON TemplateDependencyFile where
-  parseJSON (Object o) = do
+  parseJSON val@(Object o) = do
     depType <- o .: "type"
     case T.toLower . T.strip $ depType of
       "bibtex"       -> pure BibtexDepFile
-      "template"     -> TemplateDepFile     <$> o .: "body"
-      "template_pdf" -> TemplatePdfDepFile  <$> o .: "body"
+      "template"     -> TemplateDepFile     <$> parseJSON val
+      "template_pdf" -> TemplatePdfDepFile  <$> parseJSON val
       "other"        -> pure OtherDepFile
       _ -> fail $ "Unknown template type " <> unpack depType
   parseJSON _ = mzero
@@ -165,14 +167,14 @@ instance ToJSON TemplateDependencyFile where
     BibtexDepFile -> object [
         "type" .= ("bibtex" :: Text)
       ]
-    TemplateDepFile body -> object [
-        "type" .= ("template" :: Text)
-      , "body" .= body
-      ]
-    TemplatePdfDepFile body -> object [
-        "type" .= ("template_pdf" :: Text)
-      , "body" .= body
-      ]
+    TemplateDepFile body -> let
+      Object o1 = object [ "type" .= ("template" :: Text) ]
+      Object o2 = toJSON body
+      in Object (o1 <> o2)
+    TemplatePdfDepFile body -> let
+      Object o1 = object [ "type" .= ("template_pdf" :: Text) ]
+      Object o2 = toJSON body
+      in Object (o1 <> o2)
     OtherDepFile -> object [
         "type" .= ("other" :: Text)
       ]
@@ -230,10 +232,10 @@ loadTemplateInMemory TemplateFile{..} = do
           cnt <- readfile filename
           return . pure $ BibtexDep cnt
         TemplateDepFile body -> do
-          tmpl <- loadTemplateInMemory body
+          tmpl <- chdir filename $ loadTemplateInMemory body
           return $ TemplateDep <$> tmpl
         TemplatePdfDepFile body -> do
-          tmpl <- loadTemplateInMemory body
+          tmpl <- chdir filename $ loadTemplateInMemory body
           return $ TemplatePdfDep <$> tmpl
         OtherDepFile -> do
           cnt <- readBinary filename

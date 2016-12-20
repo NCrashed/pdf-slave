@@ -61,6 +61,7 @@ renderTemplate :: TemplateFile -- ^ Template to render
   -> FilePath -- ^ Output folder
   -> Sh DepFlags -- ^ Flags that affects compilation upper in the deptree
 renderTemplate TemplateFile{..} baseDir outputFolder = do
+  mkdir_p outputFolder
   depFlags <- M.traverseWithKey (renderTemplateDep baseDir outputFolder) templateFileDeps
   let
       bodyName = dropExtension templateFileBody
@@ -94,9 +95,14 @@ renderTemplateDep baseDir outputFolder name dep = case dep of
     mkdir_p (directory outputFile)
     cp (baseDir </> file) outputFile
     return $ S.singleton NeedBibtex
-  TemplateDepFile template -> renderTemplate template baseDir outputFolder
+  TemplateDepFile template -> do
+    let subFolder = baseDir </> fromText name
+        outputSubFolder = outputFolder </> fromText name
+    renderTemplate template subFolder outputSubFolder
   TemplatePdfDepFile template -> do
-    renderPdfTemplate template baseDir outputFolder
+    let subFolder = baseDir </> fromText name
+        outputSubFolder = outputFolder </> fromText name
+    renderPdfTemplate template subFolder outputSubFolder
     return mempty
   OtherDepFile -> do
     let file = fromText name

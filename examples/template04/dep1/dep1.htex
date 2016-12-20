@@ -1,0 +1,48 @@
+\begin{haskellpragmas}
+{-# LANGUAGE OverloadedStrings #-}
+\end{haskellpragmas}
+\begin{writehaskell}
+import Data.Aeson
+import System.IO.Unsafe (unsafePerformIO)
+import qualified Data.ByteString.Lazy as BS
+
+import Text.LaTeX
+import Text.LaTeX.Packages.TikZ.Simple
+
+data Input = Input {
+  lineWidth       :: Double
+, spiralPrecision :: Double
+, spiralInterval  :: (Double, Double)
+, spiralA         :: Double
+, spiralB         :: Double
+}
+
+instance FromJSON Input where
+  parseJSON (Object o) = Input
+    <$> o .: "line-width"
+    <*> o .: "spiral-precision"
+    <*> o .: "spiral-interval"
+    <*> o .: "spiral-a"
+    <*> o .: "spiral-b" -- stop highlighting hell $
+
+inpt :: Input
+inpt = case unsafePerformIO $ fmap eitherDecode' $ BS.readFile "dep1_input.json" of
+  Left e -> error (show e)
+  Right a -> a
+
+\end{writehaskell}
+
+Below is the \emph{Spira Mirabilis} inserted using the HaTeX
+package.
+\begin{writehaskell}
+spiral :: Figure
+spiral = LineWidth (Pt $ lineWidth inpt) $
+    pathImage (spiralPrecision inpt) (spiralInterval inpt) $
+      \t -> ( a * exp t * cos (b*t)
+            , a * exp t * sin (b*t)
+              )
+  where
+    a = spiralA inpt ; b = spiralB inpt
+\end{writehaskell}
+
+\hatex{center $ tikzpicture $ figuretikz spiral}
