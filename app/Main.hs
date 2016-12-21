@@ -14,10 +14,6 @@ import qualified Data.ByteString as BS
 import Text.PDF.Slave.Template
 import Text.PDF.Slave.Render
 
--- | Template mode either a all-in-one-file or located in distinct files
-data TemplateMode = Bundle | Files
-  deriving (Show, Read)
-
 -- | Define actions that CLI can do
 data Command =
   -- | Usual mode, render PDF for template
@@ -31,8 +27,6 @@ data Command =
 data Options = Options {
   -- | Path to template file, if missing, stdin is used
   templatePath  :: Maybe FilePath
-  -- | Either full bundle or partially stored at files
-, templateMode  :: TemplateMode
   -- | Path to output pdf file, if missing, stdout is used
 , pdfOutputPath :: Maybe FilePath
   -- | CLI action
@@ -50,10 +44,6 @@ optionsParser = Options
        long "template"
     <> help "Path to template YAML description, if missing stdin is used"
     <> metavar "TEMPLATE_YAML_PATH"
-    )
-  <*> flag Files Bundle (
-       long "bundle"
-    <> help "If set program expects all-in YAML template."
     )
   <*> optional (filePathOption $
        long "output"
@@ -77,28 +67,27 @@ pdfSlave Options{..} = shelly $ do
     Nothing -> pwd
     Just p -> canonic $ directory p
   -- read template
-  templateContent <- case templatePath of
-    Nothing -> liftIO $ BS.getContents
-    Just p -> readBinary p
+  (templateContent, contentFilename) <- case templatePath of
+    Nothing -> do
+      cnt <- liftIO $ BS.getContents
+      return (cnt, fromText "<stdin>")
+    Just p -> (,p) <$> readBinary p
   -- process particular CLI action
   case cliCommand of
+    -- Generate PDF from template or bundle
     GeneratePDF -> do
-      -- how to render template and print output
-      let render t = do
-            bs <- renderTemplateToPDF t baseDir
-            case pdfOutputPath of
-              Nothing -> liftIO $ BS.putStr bs
-              Just outputPath -> writeBinary outputPath bs
-      -- template mode affects type of template record
-      case templateMode of
-        Bundle -> case decodeEither' templateContent of
-          Left e -> fail $ "Failed to parse template: " <> show e
-          Right t -> withTmpDir $ \folder -> do
-            tf <- storeTemplateInFiles t folder
-            render tf
-        Files -> case decodeEither' templateContent of
-          Left e -> fail $ "Failed to parse template: " <> show e
-          Right t -> render t
+      -- parse template contents
+      res <- parseBundleOrTemplate contentFilename templateContent
+      -- render
+      bs <- case res of
+        Left bundle -> renderBundleToPDF bundle baseDir
+        Right template -> renderTemplateToPDF template baseDir
+      -- output results
+      case pdfOutputPath of
+        Nothing -> liftIO $ BS.putStr bs
+        Just outputPath -> writeBinary outputPath bs
+
+    -- Pack bundle from distrubuted template format
     PackBundle -> case decodeEither' templateContent of
       Left e -> fail $ "Failed to parse template: " <> show e
       Right tf -> do
@@ -113,6 +102,8 @@ pdfSlave Options{..} = shelly $ do
                 writeBinary outputPath bs
                 outputPath' <- toTextWarn outputPath
                 echo $ "Bundle is written to " <> outputPath'
+
+    -- Unpack bundle to distributed template format
     UnpackBundle -> case decodeEither' templateContent of
       Left e -> fail $ "Failed to parse template: " <> show e
       Right t -> case pdfOutputPath of

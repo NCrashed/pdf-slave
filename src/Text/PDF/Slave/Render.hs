@@ -1,6 +1,12 @@
 -- | Rendering of templates
 module Text.PDF.Slave.Render(
     PDFContent
+  , PDFRenderException(..)
+  , displayPDFRenderException
+  , renderBundleOrTemplateFromFile
+  , renderFromFileBundleToPDF
+  , renderFromFileToPDF
+  , renderBundleToPDF
   , renderTemplateToPDF
   -- * Low-level
   , DepFlags
@@ -8,13 +14,17 @@ module Text.PDF.Slave.Render(
   , renderPdfTemplate
   , renderTemplate
   , renderTemplateDep
+  , parseBundleOrTemplate
+  , parseBundleOrTemplateFromFile
   ) where
 
 import Control.Monad (join)
+import Control.Monad.Catch
 import Data.Aeson (Value(..))
 import Data.ByteString (ByteString)
 import Data.Monoid
 import Data.Set (Set)
+import Data.Yaml (ParseException, decodeEither')
 import Filesystem.Path (dropExtension, directory)
 import GHC.Generics
 import Prelude hiding (FilePath)
@@ -32,6 +42,83 @@ import Text.PDF.Slave.Template
 -- | Contents of PDF file
 type PDFContent = ByteString
 
+-- | Errors that are thrown by rendering functions
+data PDFRenderException =
+    TemplateFormatError FilePath ParseException -- ^ Failed to parse template YAML
+  | BundleFormatError FilePath ParseException -- ^ Failed to parse template bundle YAML
+  -- | Failed to parse file in both formats: bundle and template file.
+  | BundleOrTemplateFormatError FilePath ParseException ParseException
+  | InputFileFormatError FilePath String -- ^ Failed to parse JSON input
+  deriving (Generic, Show)
+
+instance Exception PDFRenderException
+
+-- | Convert PDF rendering exception to user readable format
+displayPDFRenderException :: PDFRenderException -> String
+displayPDFRenderException e = case e of
+  TemplateFormatError f pe -> "Failed to parse template file " <> show f
+    <> ", reason: " <> show pe
+  BundleFormatError f pe -> "Failed to parse template bundle file " <> show f
+    <> ", reason: " <> show pe
+  BundleOrTemplateFormatError f peBundle peTemplate -> "Failed to parse template file " <> show f <> ". "
+    <> "\n Tried bundle format: " <> show peBundle
+    <> "\n Tried template format: " <> show peTemplate
+  InputFileFormatError f es -> "Failed to parse template input file " <> show f
+    <> ", reason: " <> show es
+
+-- | Helper to render either a bundle or distributed template from file to PDF.
+renderBundleOrTemplateFromFile ::
+     FilePath -- ^ Path to either bundle 'Template' or template 'TemplateFile'
+  -> Sh PDFContent
+renderBundleOrTemplateFromFile filename = do
+  res <- parseBundleOrTemplateFromFile filename
+  let baseDir = directory filename
+  case res of
+    Left bundle -> renderBundleToPDF bundle baseDir
+    Right template -> renderTemplateToPDF template baseDir
+
+-- | Try to parse either a bundle or template file
+parseBundleOrTemplateFromFile :: FilePath -- ^ Path to either 'Template' or 'TemplateFile'
+  -> Sh (Either Template TemplateFile)
+parseBundleOrTemplateFromFile filename =
+  parseBundleOrTemplate filename =<< readBinary filename
+
+-- | Try to parse either a bundle or template file
+parseBundleOrTemplate :: FilePath -- ^ Source of data (file or stdin, etc)
+  -> ByteString -- ^ Contents of either 'Template' or 'TemplateFile'
+  -> Sh (Either Template TemplateFile)
+parseBundleOrTemplate filename cnt = case decodeEither' cnt of
+  Right bundle -> return $ Left bundle
+  Left eBundle -> case decodeEither' cnt of
+    Right template -> return $ Right template
+    Left eTemplate -> throwM $ BundleOrTemplateFormatError filename eBundle eTemplate
+
+-- | Helper to render from all-in bundle template
+renderFromFileBundleToPDF :: FilePath -- ^ Path to 'Template' all-in bundle
+  -> Sh PDFContent
+renderFromFileBundleToPDF filename = do
+  cnt <- readBinary filename
+  case decodeEither' cnt of
+    Left e -> throwM $ BundleFormatError filename e
+    Right template -> renderBundleToPDF template (directory filename)
+
+-- | Helper to render from template file
+renderFromFileToPDF :: FilePath -- ^ Path to 'TemplateFile'
+  -> Sh PDFContent
+renderFromFileToPDF filename = do
+  cnt <- readBinary filename
+  case decodeEither' cnt of
+    Left e -> throwM $ TemplateFormatError filename e
+    Right template -> renderTemplateToPDF template (directory filename)
+
+-- | Unpack bundle, render the template, cleanup and return PDF
+renderBundleToPDF :: Template -- ^ Input all-in template
+  -> FilePath -- ^ Base directory
+  -> Sh PDFContent
+renderBundleToPDF bundle baseDir = withTmpDir $ \unpackDir -> do
+  template <- storeTemplateInFiles bundle unpackDir
+  renderTemplateToPDF template baseDir
+
 -- | Render template and return content of resulted PDF file
 renderTemplateToPDF :: TemplateFile -- ^ Input template
   -> FilePath -- ^ Base directory
@@ -43,7 +130,7 @@ renderTemplateToPDF t@TemplateFile{..} baseDir = withTmpDir $ \outputFolder -> d
     Just inputName -> do
       cnt <- readBinary inputName
       case A.eitherDecode' . BZ.fromStrict $ cnt of
-        Left e -> fail $ "Cannot decode input file: " <> show e
+        Left e -> throwM $ InputFileFormatError inputName e
         Right a -> return $ Just a
   renderPdfTemplate minput t baseDir outputFolder
   readBinary (outputFolder </> templateFileName <.> "pdf")
