@@ -1,5 +1,4 @@
 -- | Defines document template
-{-# OPTIONS_GHC -fno-warn-orphans #-}
 module Text.PDF.Slave.Template(
     TemplateName
   , TemplateInput
@@ -11,24 +10,16 @@ module Text.PDF.Slave.Template(
   , Template(..)
   , TemplateDependencyFile(..)
   , TemplateFile(..)
-  -- * Helpers
-  , loadTemplateInMemory
-  , storeTemplateInFiles
   ) where
 
 import Control.Monad (mzero)
 import Data.ByteString (ByteString)
 import Data.Monoid
 import Data.Text as T
-import Data.Yaml
-import Filesystem.Path.CurrentOS (directory)
+import Data.Aeson
 import GHC.Generics
-import Prelude hiding (FilePath)
-import Shelly as Sh
 
-import qualified Data.Aeson             as A
 import qualified Data.ByteString.Base64 as B64
-import qualified Data.ByteString.Lazy   as BZ
 import qualified Data.Map.Strict        as M
 import qualified Data.Text.Encoding     as T
 
@@ -144,13 +135,6 @@ data TemplateDependencyFile =
   | OtherDepFile
   deriving (Generic, Show)
 
-instance FromJSON FilePath where
-  parseJSON (String s) = return $ Sh.fromText s
-  parseJSON _ = mzero
-
-instance ToJSON FilePath where
-  toJSON = String . Sh.toTextIgnore
-
 instance FromJSON TemplateDependencyFile where
   parseJSON val@(Object o) = do
     depType <- o .: "type"
@@ -185,9 +169,9 @@ data TemplateFile = TemplateFile {
   -- | Template has human readable name
     templateFileName      :: TemplateName
   -- | Template expects input in JSON format. The field contains filename of the YAML file.
-  , templateFileInput     :: Maybe FilePath
+  , templateFileInput     :: Maybe Text
   -- | Template contents filename.
-  , templateFileBody      :: FilePath
+  , templateFileBody      :: Text
   -- | Template dependencies (bibtex, listings, other htex files)
   , templateFileDeps      :: M.Map TemplateName TemplateDependencyFile
   -- | Additional flags for `haskintex`
@@ -211,81 +195,3 @@ instance ToJSON TemplateFile where
     , "dependencies"   .= templateFileDeps
     , "haskintex-opts" .= templateFileHaskintexOpts
     ]
-
--- | Load all external references of template into memory
-loadTemplateInMemory :: TemplateFile -> Sh (Either String Template)
-loadTemplateInMemory TemplateFile{..} = do
-  inputCnt <- case templateFileInput of
-    Nothing -> return $ Right Nothing
-    Just fname -> do
-      cnt <- readBinary fname
-      return $ fmap Just . A.eitherDecode' . BZ.fromStrict $ cnt
-  body <- readfile templateFileBody
-  deps <- M.traverseWithKey loadDep templateFileDeps
-  return $ Template
-    <$> pure templateFileName
-    <*> inputCnt
-    <*> pure body
-    <*> sequence deps
-    <*> pure templateFileHaskintexOpts
-  where
-    loadDep name d = let
-      filename = fromText name
-      in case d of
-        BibtexDepFile -> do
-          cnt <- readfile filename
-          return . pure $ BibtexDep cnt
-        TemplateDepFile body -> do
-          tmpl <- chdir filename $ loadTemplateInMemory body
-          return $ TemplateDep <$> tmpl
-        TemplatePdfDepFile body -> do
-          tmpl <- chdir filename $ loadTemplateInMemory body
-          return $ TemplatePdfDep <$> tmpl
-        OtherDepFile -> do
-          cnt <- readBinary filename
-          return . pure $ OtherDep cnt
-
--- | Extract all external references of template into file system
-storeTemplateInFiles :: Template -> FilePath -> Sh TemplateFile
-storeTemplateInFiles Template{..} folder = do
-  mkdir_p folder
-  relInputName <- case templateInput of
-    Nothing -> return Nothing
-    Just input -> do
-      let inputName = folder </> (templateName <> "_input") <.> "json"
-      writeBinary inputName $ BZ.toStrict $ A.encode input
-      fmap Just $ relativeTo folder inputName
-  let bodyName = folder </> templateName <.> "htex"
-  mkdir_p $ directory bodyName
-  writefile bodyName templateBody
-  relBodyName <- relativeTo folder bodyName
-  deps <- M.traverseWithKey storeDep templateDeps
-  return $ TemplateFile {
-      templateFileName = templateName
-    , templateFileInput = relInputName
-    , templateFileBody = relBodyName
-    , templateFileDeps = deps
-    , templateFileHaskintexOpts = templateHaskintexOpts
-    }
-  where
-    storeDep name d = case d of
-      BibtexDep body -> do
-        let bodyName = folder </> name
-        mkdir_p $ directory bodyName
-        writefile bodyName body
-        return BibtexDepFile
-      TemplateDep template -> do
-        let subfolderName = folder </> Sh.fromText name
-        mkdir_p subfolderName
-        dep <- storeTemplateInFiles template subfolderName
-        return $ TemplateDepFile dep
-      TemplatePdfDep template -> do
-        let subfolderName = folder </> Sh.fromText name
-        mkdir_p subfolderName
-        dep <- storeTemplateInFiles template subfolderName
-        return $ TemplatePdfDepFile dep
-      OtherDep body -> do
-        let bodyName = folder </> name
-        mkdir_p $ directory bodyName
-        writeBinary bodyName body
-        return OtherDepFile

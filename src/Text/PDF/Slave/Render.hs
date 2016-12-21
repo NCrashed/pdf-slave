@@ -8,6 +8,8 @@ module Text.PDF.Slave.Render(
   , renderFromFileToPDF
   , renderBundleToPDF
   , renderTemplateToPDF
+  , loadTemplateInMemory
+  , storeTemplateInFiles
   -- * Low-level
   , DepFlags
   , DepFlag(..)
@@ -135,9 +137,10 @@ renderTemplateToPDF t@TemplateFile{..} baseDir = withTmpDir $ \outputFolder -> d
   minput <- case templateFileInput of
     Nothing -> return Nothing
     Just inputName -> do
-      cnt <- readBinary inputName
+      let inputNamePath = fromText inputName
+      cnt <- readBinary inputNamePath
       case A.eitherDecode' . BZ.fromStrict $ cnt of
-        Left e -> throwM $ InputFileFormatError inputName e
+        Left e -> throwM $ InputFileFormatError inputNamePath e
         Right a -> return $ Just a
   renderPdfTemplate minput t baseDir outputFolder
   readBinary (outputFolder </> templateFileName <.> "pdf")
@@ -175,7 +178,7 @@ renderTemplate minput TemplateFile{..} baseDir outputFolder = do
   let renderDepenency = renderTemplateDep minput baseDir outputFolder
   depFlags <- M.traverseWithKey renderDepenency templateFileDeps
   let
-      bodyName = dropExtension templateFileBody
+      bodyName = dropExtension (fromText templateFileBody)
       haskintex = bash "haskintex" $ [
           "-overwrite"
         , "-verbose"
@@ -239,3 +242,81 @@ renderTemplateDep minput baseDir outputFolder name dep = case dep of
 whenJust :: Applicative f => Maybe a -> (a -> f ()) -> f ()
 whenJust Nothing _ = pure ()
 whenJust (Just a) f = f a
+
+-- | Load all external references of template into memory
+loadTemplateInMemory :: TemplateFile -> Sh (Either String Template)
+loadTemplateInMemory TemplateFile{..} = do
+  inputCnt <- case templateFileInput of
+    Nothing -> return $ Right Nothing
+    Just fname -> do
+      cnt <- readBinary . fromText $ fname
+      return $ fmap Just . A.eitherDecode' . BZ.fromStrict $ cnt
+  body <- readfile . fromText $ templateFileBody
+  deps <- M.traverseWithKey loadDep templateFileDeps
+  return $ Template
+    <$> pure templateFileName
+    <*> inputCnt
+    <*> pure body
+    <*> sequence deps
+    <*> pure templateFileHaskintexOpts
+  where
+    loadDep name d = let
+      filename = fromText name
+      in case d of
+        BibtexDepFile -> do
+          cnt <- readfile filename
+          return . pure $ BibtexDep cnt
+        TemplateDepFile body -> do
+          tmpl <- chdir filename $ loadTemplateInMemory body
+          return $ TemplateDep <$> tmpl
+        TemplatePdfDepFile body -> do
+          tmpl <- chdir filename $ loadTemplateInMemory body
+          return $ TemplatePdfDep <$> tmpl
+        OtherDepFile -> do
+          cnt <- readBinary filename
+          return . pure $ OtherDep cnt
+
+-- | Extract all external references of template into file system
+storeTemplateInFiles :: Template -> FilePath -> Sh TemplateFile
+storeTemplateInFiles Template{..} folder = do
+  mkdir_p folder
+  relInputName <- case templateInput of
+    Nothing -> return Nothing
+    Just input -> do
+      let inputName = folder </> (templateName <> "_input") <.> "json"
+      writeBinary inputName $ BZ.toStrict $ A.encode input
+      fmap Just $ relativeTo folder inputName
+  let bodyName = folder </> templateName <.> "htex"
+  mkdir_p $ directory bodyName
+  writefile bodyName templateBody
+  relBodyName <- relativeTo folder bodyName
+  deps <- M.traverseWithKey storeDep templateDeps
+  return $ TemplateFile {
+      templateFileName = templateName
+    , templateFileInput = fmap toTextIgnore relInputName
+    , templateFileBody = toTextIgnore relBodyName
+    , templateFileDeps = deps
+    , templateFileHaskintexOpts = templateHaskintexOpts
+    }
+  where
+    storeDep name d = case d of
+      BibtexDep body -> do
+        let bodyName = folder </> name
+        mkdir_p $ directory bodyName
+        writefile bodyName body
+        return BibtexDepFile
+      TemplateDep template -> do
+        let subfolderName = folder </> fromText name
+        mkdir_p subfolderName
+        dep <- storeTemplateInFiles template subfolderName
+        return $ TemplateDepFile dep
+      TemplatePdfDep template -> do
+        let subfolderName = folder </> fromText name
+        mkdir_p subfolderName
+        dep <- storeTemplateInFiles template subfolderName
+        return $ TemplatePdfDepFile dep
+      OtherDep body -> do
+        let bodyName = folder </> name
+        mkdir_p $ directory bodyName
+        writeBinary bodyName body
+        return OtherDepFile

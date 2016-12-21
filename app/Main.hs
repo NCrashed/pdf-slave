@@ -103,8 +103,9 @@ pdfSlave Options{..} = shelly $ do
           let bundle' = fromMaybe bundle $ (\i -> bundle { templateInput = i }) <$> optInput
           renderBundleToPDF bundle' baseDir
         Right template -> do
+          inputOverwrite <- sequence $ fmap toTextWarn inputOverwritePath
           let template' = fromMaybe template $
-                (const $ template { templateFileInput = inputOverwritePath}) <$> optInput
+                (const $ template { templateFileInput = inputOverwrite }) <$> optInput
           renderTemplateToPDF template' baseDir
       -- output results
       case pdfOutputPath of
