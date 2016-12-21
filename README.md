@@ -1,7 +1,7 @@
 pdf-slave
 =========
 
-Tool that compiles `haskintex` (TeX with embedded Haskell) files into PDF documents.
+Tool that compiles [haskintex](http://daniel-diaz.github.io/projects/haskintex/) (TeX with embedded Haskell) files into PDF documents.
 Templates are described in YAML format and can define dependencies.
 
 Features:
@@ -28,7 +28,7 @@ The new tool takes the burden away. Now all static files and generation code is
 located within a single template project, that describes how to build your PDF document in a declaretive way.
 
 Common work flow with pdf-slave:
-* Develop template from several LaTeX files with embedded Haskell (thanks to haskintex
+* Develop template from several LaTeX files with embedded Haskell (thanks to [haskintex](http://daniel-diaz.github.io/projects/haskintex/)
  tool)
 
 * Pack the template project into bundle all-in file.
