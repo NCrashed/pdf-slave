@@ -12,7 +12,7 @@ Features:
 
 * Support for template dependencies that include:
   - Bibtex files
-  - Images, other static files.
+  - Images, listings, other static files.
   - Other `.htex` templates that compiles into TeX and includes into parent template.
   - Other `.htex` templates that compiles into PDF and includes into parent template.
 
@@ -155,7 +155,7 @@ listings etc. Example of YAML configuration:
 
   See [examples/example05](https://github.com/NCrashed/pdf-slave/tree/master/examples/template05) for full example.
 
-### Input propogation
+### Input propagation
 
 When you work with dependencies you have two options how to handle inputs:
 
@@ -216,6 +216,9 @@ As modification of such bundles isn't handy, one can unpack bundle:
 ``` bash
 pdf-slave --template template01_bundle.yaml --output template01_directory unpack
 ```
+
+Rendering of bundles is handled with the same command that is used for ordinary
+templates.
 
 Compilation
 ===========
