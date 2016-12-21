@@ -16,6 +16,27 @@ Features:
   - Other `.htex` templates that compiles into TeX and includes into parent template.
   - Other `.htex` templates that compiles into PDF and includes into parent template.
 
+Description
+===========
+
+In many real-world systems we need to produce reports, cheques and other documents
+to users. One possible solution is rendering LaTeX files, but it is not flexible
+enough as you need to solve burden with generation of LaTeX file from varying inputs,
+manage static files like images and handling dependencies between pieces of document.
+
+The new tool takes the burden away. Now all static files and generation code is
+located within a single template project, that describes how to build your PDF document in a declaretive way.
+
+Common work flow with pdf-slave:
+* Develop template from several LaTeX files with embedded Haskell (thanks to haskintex
+ tool)
+
+* Pack the template project into bundle all-in file.
+
+* Distribute the bundle (for instance to your service server).
+
+* Call pdf-slave with bundle and inputs in JSON file to generate PDF document.
+
 Template reference
 ==================
 

@@ -16,6 +16,12 @@ module Text.PDF.Slave(
   , storeTemplateInFiles
   -- * Template rendering to PDF
   , PDFContent
+  , PDFRenderException(..)
+  , displayPDFRenderException
+  , renderBundleOrTemplateFromFile
+  , renderFromFileBundleToPDF
+  , renderFromFileToPDF
+  , renderBundleToPDF
   , renderTemplateToPDF
   ) where
 
