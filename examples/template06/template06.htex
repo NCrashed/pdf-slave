@@ -4,7 +4,7 @@
 \usepackage{listings}
 \usepackage{tikz}
 
-\title{Template dependency}
+\title{Input propagation}
 \author{Anton Gushcha}
 
 \begin{document}

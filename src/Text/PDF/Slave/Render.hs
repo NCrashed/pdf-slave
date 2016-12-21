@@ -22,6 +22,7 @@ import Control.Monad (join)
 import Control.Monad.Catch
 import Data.Aeson (Value(..))
 import Data.ByteString (ByteString)
+import Data.Maybe (fromMaybe)
 import Data.Monoid
 import Data.Set (Set)
 import Data.Yaml (ParseException, decodeEither')
@@ -69,12 +70,15 @@ displayPDFRenderException e = case e of
 -- | Helper to render either a bundle or distributed template from file to PDF.
 renderBundleOrTemplateFromFile ::
      FilePath -- ^ Path to either bundle 'Template' or template 'TemplateFile'
+  -> Maybe Value -- ^ Overwrite of input JSON for bundle
   -> Sh PDFContent
-renderBundleOrTemplateFromFile filename = do
+renderBundleOrTemplateFromFile filename bundleInput = do
   res <- parseBundleOrTemplateFromFile filename
   let baseDir = directory filename
   case res of
-    Left bundle -> renderBundleToPDF bundle baseDir
+    Left bundle -> do
+      let bundle' = fromMaybe bundle $ fmap (\i -> bundle { templateInput = Just i }) bundleInput
+      renderBundleToPDF bundle' baseDir
     Right template -> renderTemplateToPDF template baseDir
 
 -- | Try to parse either a bundle or template file
@@ -95,12 +99,15 @@ parseBundleOrTemplate filename cnt = case decodeEither' cnt of
 
 -- | Helper to render from all-in bundle template
 renderFromFileBundleToPDF :: FilePath -- ^ Path to 'Template' all-in bundle
+  -> Maybe Value -- ^ Overwrite of input JSON for bundle
   -> Sh PDFContent
-renderFromFileBundleToPDF filename = do
+renderFromFileBundleToPDF filename bundleInput = do
   cnt <- readBinary filename
   case decodeEither' cnt of
     Left e -> throwM $ BundleFormatError filename e
-    Right template -> renderBundleToPDF template (directory filename)
+    Right bundle -> do
+      let bundle' = fromMaybe bundle $ fmap (\i -> bundle { templateInput = Just i }) bundleInput
+      renderBundleToPDF bundle' (directory filename)
 
 -- | Helper to render from template file
 renderFromFileToPDF :: FilePath -- ^ Path to 'TemplateFile'

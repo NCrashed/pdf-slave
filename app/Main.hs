@@ -1,6 +1,7 @@
 module Main where
 
 import Control.Monad.IO.Class
+import Data.Maybe (fromMaybe)
 import Data.Monoid
 import Data.Text (pack)
 import Data.Yaml (decodeEither', encode)
@@ -9,7 +10,9 @@ import Options.Applicative as O
 import Prelude hiding (FilePath)
 import Shelly
 
+import qualified Data.Aeson as A
 import qualified Data.ByteString as BS
+import qualified Data.ByteString.Lazy as BZ
 
 import Text.PDF.Slave.Template
 import Text.PDF.Slave.Render
@@ -29,6 +32,8 @@ data Options = Options {
   templatePath  :: Maybe FilePath
   -- | Path to output pdf file, if missing, stdout is used
 , pdfOutputPath :: Maybe FilePath
+  -- | Path to JSON input file for overwritting input data of bundle
+, inputOverwritePath :: Maybe FilePath
   -- | CLI action
 , cliCommand    ::  Command
 }
@@ -42,13 +47,19 @@ optionsParser :: Parser Options
 optionsParser = Options
   <$> optional (filePathOption $
        long "template"
-    <> help "Path to template YAML description, if missing stdin is used"
+    <> help "Path to template or bundle YAML description, if missing stdin is used"
     <> metavar "TEMPLATE_YAML_PATH"
     )
   <*> optional (filePathOption $
        long "output"
     <> help "Path to output PDF file, if missing stdout is used"
     <> metavar "OUTPUT_PDF_PATH"
+    )
+  <*> optional (filePathOption $
+       long "input"
+    <> help ("You can specify JSON file as input that will overwrite default input"
+      <> " for bundle or template input file" )
+    <> metavar "INPUT_JSON_PATH"
     )
   <*> commandParser
 
@@ -72,6 +83,14 @@ pdfSlave Options{..} = shelly $ do
       cnt <- liftIO $ BS.getContents
       return (cnt, fromText "<stdin>")
     Just p -> (,p) <$> readBinary p
+  -- read optional input overwrite
+  optInput <- case inputOverwritePath of
+    Nothing -> return Nothing
+    Just p -> do
+      cnt <- readBinary p
+      case A.eitherDecode' . BZ.fromStrict $ cnt of
+        Left e -> fail $ "Failed to read input overwrite file: " <> show e
+        Right i -> return $ Just i
   -- process particular CLI action
   case cliCommand of
     -- Generate PDF from template or bundle
@@ -80,8 +99,13 @@ pdfSlave Options{..} = shelly $ do
       res <- parseBundleOrTemplate contentFilename templateContent
       -- render
       bs <- case res of
-        Left bundle -> renderBundleToPDF bundle baseDir
-        Right template -> renderTemplateToPDF template baseDir
+        Left bundle -> do
+          let bundle' = fromMaybe bundle $ (\i -> bundle { templateInput = i }) <$> optInput
+          renderBundleToPDF bundle' baseDir
+        Right template -> do
+          let template' = fromMaybe template $
+                (const $ template { templateFileInput = inputOverwritePath}) <$> optInput
+          renderTemplateToPDF template' baseDir
       -- output results
       case pdfOutputPath of
         Nothing -> liftIO $ BS.putStr bs
