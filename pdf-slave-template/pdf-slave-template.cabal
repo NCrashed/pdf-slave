@@ -1,5 +1,5 @@
 name:                pdf-slave-template
-version:             1.1.0.0
+version:             1.2.0.0
 synopsis:            Template format definition for pdf-slave tool
 description:         Please see README.md
 homepage:            https://github.com/ncrashed/pdf-slave#readme

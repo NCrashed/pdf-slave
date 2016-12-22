@@ -12,7 +12,7 @@ module Text.PDF.Slave.Template(
   , TemplateFile(..)
   ) where
 
-import Control.Monad (mzero)
+import Control.Monad (mzero, unless)
 import Data.ByteString (ByteString)
 import Data.Monoid
 import Data.Text as T
@@ -102,12 +102,15 @@ data Template = Template {
   } deriving (Generic, Show)
 
 instance FromJSON Template where
-  parseJSON (Object o) = Template
-    <$> o .: "name"
-    <*> o .:? "input"
-    <*> o .: "body"
-    <*> o .:? "dependencies" .!= mempty
-    <*> o .:? "haskintex-opts" .!= mempty
+  parseJSON (Object o) = do
+    flag <- o .: "bundle"
+    unless flag $ fail "Expected bundle template format, but got ordinary template"
+    Template
+      <$> o .: "name"
+      <*> o .:? "input"
+      <*> o .: "body"
+      <*> o .:? "dependencies" .!= mempty
+      <*> o .:? "haskintex-opts" .!= mempty
   parseJSON _ = mzero
 
 instance ToJSON Template where
@@ -117,6 +120,7 @@ instance ToJSON Template where
     , "body"           .= templateBody
     , "dependencies"   .= templateDeps
     , "haskintex-opts" .= templateHaskintexOpts
+    , "bundle"         .= True
     ]
 
 -- | Same as 'TemplateDependency' but keeps contents in separate files
@@ -179,12 +183,17 @@ data TemplateFile = TemplateFile {
   } deriving (Generic, Show)
 
 instance FromJSON TemplateFile where
-  parseJSON (Object o) = TemplateFile
-    <$> o .: "name"
-    <*> o .:? "input"
-    <*> o .: "body"
-    <*> o .:? "dependencies" .!= mempty
-    <*> o .:? "haskintex-opts" .!= mempty
+  parseJSON (Object o) = do
+    mflag <- o .:? "bundle"
+    case mflag of
+      Just True -> fail "Expected ordinary template format, but got bundle template"
+      _ -> return ()
+    TemplateFile
+      <$> o .: "name"
+      <*> o .:? "input"
+      <*> o .: "body"
+      <*> o .:? "dependencies" .!= mempty
+      <*> o .:? "haskintex-opts" .!= mempty
   parseJSON _ = mzero
 
 instance ToJSON TemplateFile where
