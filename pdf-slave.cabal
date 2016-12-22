@@ -1,5 +1,5 @@
 name:                pdf-slave
-version:             1.1.0.0
+version:             1.2.0.0
 synopsis:            Tool to generate PDF from haskintex templates and YAML input
 description:         Please see README.md
 homepage:            https://github.com/NCrashed/pdf-slave#readme
@@ -31,7 +31,7 @@ library
     , exceptions               >= 0.8      && < 0.9
     , haskintex                >= 0.6      && < 0.8
     , HaTeX                    >= 3.16     && < 3.18
-    , pdf-slave-template       == 1.1.0.0
+    , pdf-slave-template       == 1.2.0.0
     , shelly                   >= 1.6      && < 1.7
     , system-filepath          >= 0.4      && < 0.5
     , unordered-containers     >= 0.2      && < 0.3

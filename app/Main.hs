@@ -4,9 +4,11 @@ import Control.Monad.IO.Class
 import Data.Maybe (fromMaybe)
 import Data.Monoid
 import Data.Text (pack)
+import Data.Version (showVersion)
 import Data.Yaml (decodeEither', encode)
 import Filesystem.Path.CurrentOS (directory)
 import Options.Applicative as O
+import Paths_pdf_slave (version)
 import Prelude hiding (FilePath)
 import Shelly
 
@@ -25,6 +27,8 @@ data Command =
   | PackBundle
   -- | Make a template distributed over files from all-in bundle
   | UnpackBundle
+  -- | Print version number
+  | PrintVersion
 
 -- | CLI options
 data Options = Options {
@@ -69,77 +73,83 @@ commandParser = subparser $
      (O.command "pdf" $ info (pure GeneratePDF) $ progDesc "Generate PDF from template")
   <> (O.command "pack" $ info (pure PackBundle) $ progDesc "Construct all-in bundle from template distributed over files")
   <> (O.command "unpack" $ info (pure UnpackBundle) $ progDesc "Deconstruct all-in bundle to several files")
+  <> (O.command "version" $ info (pure PrintVersion) $ progDesc "Print program version")
 
 -- | Execute PDF slave
 pdfSlave :: Options -> IO ()
-pdfSlave Options{..} = shelly $ do
-  -- define base directory
-  baseDir <- case templatePath of
-    Nothing -> pwd
-    Just p -> canonic $ directory p
-  -- read template
-  (templateContent, contentFilename) <- case templatePath of
-    Nothing -> do
-      cnt <- liftIO $ BS.getContents
-      return (cnt, fromText "<stdin>")
-    Just p -> (,p) <$> readBinary p
-  -- read optional input overwrite
-  optInput <- case inputOverwritePath of
-    Nothing -> return Nothing
-    Just p -> do
-      cnt <- readBinary p
-      case A.eitherDecode' . BZ.fromStrict $ cnt of
-        Left e -> fail $ "Failed to read input overwrite file: " <> show e
-        Right i -> return $ Just i
-  -- process particular CLI action
-  case cliCommand of
-    -- Generate PDF from template or bundle
-    GeneratePDF -> do
-      -- parse template contents
-      res <- parseBundleOrTemplate contentFilename templateContent
-      -- render
-      bs <- case res of
-        Left bundle -> do
-          let bundle' = fromMaybe bundle $ (\i -> bundle { templateInput = i }) <$> optInput
-          renderBundleToPDF bundle' baseDir
-        Right template -> do
-          inputOverwrite <- sequence $ fmap toTextWarn inputOverwritePath
-          let template' = fromMaybe template $
-                (const $ template { templateFileInput = inputOverwrite }) <$> optInput
-          renderTemplateToPDF template' baseDir
-      -- output results
-      case pdfOutputPath of
-        Nothing -> liftIO $ BS.putStr bs
-        Just outputPath -> writeBinary outputPath bs
+pdfSlave Options{..} = case cliCommand of
+  PrintVersion -> putStrLn $ "pdf-slave " <> showVersion version
+  _ -> doMainActions
+  where
+  doMainActions = shelly $ do
+    -- define base directory
+    baseDir <- case templatePath of
+      Nothing -> pwd
+      Just p -> canonic $ directory p
+    -- read template
+    (templateContent, contentFilename) <- case templatePath of
+      Nothing -> do
+        cnt <- liftIO $ BS.getContents
+        return (cnt, fromText "<stdin>")
+      Just p -> (,p) <$> readBinary p
+    -- read optional input overwrite
+    optInput <- case inputOverwritePath of
+      Nothing -> return Nothing
+      Just p -> do
+        cnt <- readBinary p
+        case A.eitherDecode' . BZ.fromStrict $ cnt of
+          Left e -> fail $ "Failed to read input overwrite file: " <> show e
+          Right i -> return $ Just i
+    -- process particular CLI action
+    case cliCommand of
+      -- Generate PDF from template or bundle
+      GeneratePDF -> do
+        -- parse template contents
+        res <- parseBundleOrTemplate contentFilename templateContent
+        -- render
+        bs <- case res of
+          Left bundle -> do
+            let bundle' = fromMaybe bundle $ (\i -> bundle { templateInput = i }) <$> optInput
+            renderBundleToPDF bundle'
+          Right template -> do
+            inputOverwrite <- sequence $ fmap toTextWarn inputOverwritePath
+            let template' = fromMaybe template $
+                  (const $ template { templateFileInput = inputOverwrite }) <$> optInput
+            renderTemplateToPDF template' baseDir
+        -- output results
+        case pdfOutputPath of
+          Nothing -> liftIO $ BS.putStr bs
+          Just outputPath -> writeBinary outputPath bs
 
-    -- Pack bundle from distrubuted template format
-    PackBundle -> case decodeEither' templateContent of
-      Left e -> fail $ "Failed to parse template: " <> show e
-      Right tf -> do
-        res <- loadTemplateInMemory tf
-        case res of
-          Left e -> fail $ "Failed to pack bundle: " <> show e
-          Right t -> do
-            let bs = encode t
-            case pdfOutputPath of
-              Nothing -> liftIO $ BS.putStr bs
-              Just outputPath -> do
-                writeBinary outputPath bs
-                outputPath' <- toTextWarn outputPath
-                echo $ "Bundle is written to " <> outputPath'
+      -- Pack bundle from distrubuted template format
+      PackBundle -> case decodeEither' templateContent of
+        Left e -> fail $ "Failed to parse template: " <> show e
+        Right tf -> do
+          res <- loadTemplateInMemory tf baseDir
+          case res of
+            Left e -> fail $ "Failed to pack bundle: " <> show e
+            Right t -> do
+              let bs = encode t
+              case pdfOutputPath of
+                Nothing -> liftIO $ BS.putStr bs
+                Just outputPath -> do
+                  writeBinary outputPath bs
+                  outputPath' <- toTextWarn outputPath
+                  echo $ "Bundle is written to " <> outputPath'
 
-    -- Unpack bundle to distributed template format
-    UnpackBundle -> case decodeEither' templateContent of
-      Left e -> fail $ "Failed to parse template: " <> show e
-      Right t -> case pdfOutputPath of
-        Nothing -> fail "Expecting --output parameter as destination folder"
-        Just outputFolder -> do
-          mkdir_p outputFolder
-          tf <- storeTemplateInFiles t outputFolder
-          let templateFilename = outputFolder </> templateName t <.> "yaml"
-          writeBinary templateFilename $ encode tf
-          outputFolder' <- toTextWarn outputFolder
-          echo $ "Bundle is unpacked to " <> outputFolder'
+      -- Unpack bundle to distributed template format
+      UnpackBundle -> case decodeEither' templateContent of
+        Left e -> fail $ "Failed to parse template: " <> show e
+        Right t -> case pdfOutputPath of
+          Nothing -> fail "Expecting --output parameter as destination folder"
+          Just outputFolder -> do
+            mkdir_p outputFolder
+            tf <- storeTemplateInFiles t outputFolder
+            let templateFilename = outputFolder </> templateName t <.> "yaml"
+            writeBinary templateFilename $ encode tf
+            outputFolder' <- toTextWarn outputFolder
+            echo $ "Bundle is unpacked to " <> outputFolder'
+      _ -> return ()
 
 main :: IO ()
 main = execParser opts >>= pdfSlave

@@ -80,7 +80,7 @@ renderBundleOrTemplateFromFile filename bundleInput = do
   case res of
     Left bundle -> do
       let bundle' = fromMaybe bundle $ fmap (\i -> bundle { templateInput = Just i }) bundleInput
-      renderBundleToPDF bundle' baseDir
+      renderBundleToPDF bundle'
     Right template -> renderTemplateToPDF template baseDir
 
 -- | Try to parse either a bundle or template file
@@ -109,7 +109,7 @@ renderFromFileBundleToPDF filename bundleInput = do
     Left e -> throwM $ BundleFormatError filename e
     Right bundle -> do
       let bundle' = fromMaybe bundle $ fmap (\i -> bundle { templateInput = Just i }) bundleInput
-      renderBundleToPDF bundle' (directory filename)
+      renderBundleToPDF bundle'
 
 -- | Helper to render from template file
 renderFromFileToPDF :: FilePath -- ^ Path to 'TemplateFile'
@@ -122,11 +122,10 @@ renderFromFileToPDF filename = do
 
 -- | Unpack bundle, render the template, cleanup and return PDF
 renderBundleToPDF :: Template -- ^ Input all-in template
-  -> FilePath -- ^ Base directory
   -> Sh PDFContent
-renderBundleToPDF bundle baseDir = withTmpDir $ \unpackDir -> do
+renderBundleToPDF bundle = withTmpDir $ \unpackDir -> do
   template <- storeTemplateInFiles bundle unpackDir
-  renderTemplateToPDF template baseDir
+  renderTemplateToPDF template unpackDir
 
 -- | Render template and return content of resulted PDF file
 renderTemplateToPDF :: TemplateFile -- ^ Input template
@@ -138,7 +137,7 @@ renderTemplateToPDF t@TemplateFile{..} baseDir = withTmpDir $ \outputFolder -> d
     Nothing -> return Nothing
     Just inputName -> do
       let inputNamePath = fromText inputName
-      cnt <- readBinary inputNamePath
+      cnt <- readBinary (baseDir </> inputNamePath)
       case A.eitherDecode' . BZ.fromStrict $ cnt of
         Left e -> throwM $ InputFileFormatError inputNamePath e
         Right a -> return $ Just a
@@ -244,14 +243,14 @@ whenJust Nothing _ = pure ()
 whenJust (Just a) f = f a
 
 -- | Load all external references of template into memory
-loadTemplateInMemory :: TemplateFile -> Sh (Either String Template)
-loadTemplateInMemory TemplateFile{..} = do
+loadTemplateInMemory :: TemplateFile -> FilePath -> Sh (Either String Template)
+loadTemplateInMemory TemplateFile{..} baseDir = do
   inputCnt <- case templateFileInput of
     Nothing -> return $ Right Nothing
     Just fname -> do
-      cnt <- readBinary . fromText $ fname
+      cnt <- readBinary $ baseDir </> fromText fname
       return $ fmap Just . A.eitherDecode' . BZ.fromStrict $ cnt
-  body <- readfile . fromText $ templateFileBody
+  body <- readfile $ baseDir </> fromText templateFileBody
   deps <- M.traverseWithKey loadDep templateFileDeps
   return $ Template
     <$> pure templateFileName
@@ -261,16 +260,16 @@ loadTemplateInMemory TemplateFile{..} = do
     <*> pure templateFileHaskintexOpts
   where
     loadDep name d = let
-      filename = fromText name
+      filename = baseDir </> fromText name
       in case d of
         BibtexDepFile -> do
           cnt <- readfile filename
           return . pure $ BibtexDep cnt
         TemplateDepFile body -> do
-          tmpl <- chdir filename $ loadTemplateInMemory body
+          tmpl <- loadTemplateInMemory body filename
           return $ TemplateDep <$> tmpl
         TemplatePdfDepFile body -> do
-          tmpl <- chdir filename $ loadTemplateInMemory body
+          tmpl <- loadTemplateInMemory body filename
           return $ TemplatePdfDep <$> tmpl
         OtherDepFile -> do
           cnt <- readBinary filename

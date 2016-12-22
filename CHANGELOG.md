@@ -1,3 +1,15 @@
+1.2.0.0
+=======
+
+* Add `version` command to CLI.
+
+* Fix: `renderBundleToPDF` doesn't take base directory.
+
+* Fix: `loadTemplateInMemory` now takes base directory.
+
+* Strong distinguish between bundle and ordinary template format. Bundle templates
+have to define `bundle: true` inside the YAML files.
+
 1.1.0.0
 =======
 
