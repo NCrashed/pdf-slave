@@ -181,6 +181,7 @@ renderTemplate minput TemplateFile{..} baseDir outputFolder = do
       haskintex = bash "haskintex" $ [
           "-overwrite"
         , "-verbose"
+        , "-werror"
         , toTextArg $ baseDir </> bodyName ]
         ++ templateFileHaskintexOpts
   -- input file might be missing, if missing we can inject input from parent

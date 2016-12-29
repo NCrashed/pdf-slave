@@ -1,3 +1,8 @@
+1.2.1.0
+=======
+
+* Execute `haskintex` with `-werror` flag.
+
 1.2.0.0
 =======
 
