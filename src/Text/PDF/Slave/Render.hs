@@ -20,7 +20,7 @@ module Text.PDF.Slave.Render(
   , parseBundleOrTemplateFromFile
   ) where
 
-import Control.Monad (join)
+import Control.Monad (join, forM_)
 import Control.Monad.Catch
 import Data.Aeson (Value(..))
 import Data.ByteString (ByteString)
@@ -185,13 +185,17 @@ renderTemplate minput TemplateFile{..} baseDir outputFolder = do
         , toTextArg $ baseDir </> bodyName ]
         ++ templateFileHaskintexOpts
   -- input file might be missing, if missing we can inject input from parent
+  let outputFixedInputName = outputFolder </> (templateFileName <> "_input") <.> "json"
   case templateFileInput of
     Nothing -> whenJust minput $ \input -> do
-      let filename = outputFolder </> (templateFileName <> "_input") <.> "json"
-      writeBinary filename $ BZ.toStrict . A.encode $ input
+      writeBinary outputFixedInputName $ BZ.toStrict . A.encode $ input
     Just inputName -> do
       let inputPath = baseDir </> inputName
-      cp inputPath $ outputFolder </> inputName
+      -- copy in two places as the user might expect that input name would be equal
+      -- to specified in template file and copy to standard place in case of unpacked
+      -- bundle behavior.
+      let outputInputPaths = [outputFolder </> inputName, outputFixedInputName]
+      forM_ outputInputPaths $ cp inputPath
   _ <- chdir outputFolder haskintex
   return $ F.foldMap id depFlags -- merge flags
 

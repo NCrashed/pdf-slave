@@ -1,3 +1,8 @@
+1.2.2.0
+=======
+
+* Always copy input file to `<template_name>_input.json`.
+
 1.2.1.0
 =======
 
