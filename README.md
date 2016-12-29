@@ -93,6 +93,9 @@ inpt = case unsafePerformIO $ fmap eitherDecode' $ BS.readFile "template_input.j
 \end{writehaskell}
 ```
 
+Note: The tool copies JSON with inputs to build folder with .htex twice, once with
+name specified at `input` key in template description and secondly at fixed `<template_name>_input.json`.
+
 * `template.yaml` - description of template and its dependencies.
 
 ``` YAML
