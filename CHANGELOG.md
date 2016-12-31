@@ -1,3 +1,8 @@
+1.2.3.0
+=======
+
+* Support compilation with GHC 7.10.
+
 1.2.2.0
 =======
 
