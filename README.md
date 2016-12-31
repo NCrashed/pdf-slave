@@ -1,6 +1,8 @@
 pdf-slave
 =========
 
+[![Build Status](https://travis-ci.org/NCrashed/pdf-slave.svg?branch=master)](https://travis-ci.org/NCrashed/pdf-slave)
+
 Tool that compiles [haskintex](http://daniel-diaz.github.io/projects/haskintex/) (TeX with embedded Haskell) files into PDF documents.
 Templates are described in YAML format and can define dependencies.
 
