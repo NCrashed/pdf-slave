@@ -15,6 +15,9 @@ extra-source-files:
   README.md
   CHANGELOG.md
   stack.yaml
+tested-with:
+    GHC == 7.10.2
+  , GHC == 8.0.1
 
 library
   hs-source-dirs:      src
