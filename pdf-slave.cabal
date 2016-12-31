@@ -66,3 +66,8 @@ executable pdf-slave
     OverloadedStrings
     RecordWildCards
     TupleSections
+
+source-repository head
+  type:     git
+  location: https://github.com/NCrashed/pdf-slave.git
+
