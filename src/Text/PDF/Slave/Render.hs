@@ -185,7 +185,7 @@ renderTemplate minput TemplateFile{..} baseDir outputFolder = do
         , toTextArg $ baseDir </> bodyName ]
         ++ templateFileHaskintexOpts
   -- input file might be missing, if missing we can inject input from parent
-  let outputFixedInputName = outputFolder </> (templateFileName <> "_input") <.> "json"
+  let outputFixedInputName = outputFolder </> (("input" :: FilePath) <.> "json")
   case templateFileInput of
     Nothing -> whenJust minput $ \input -> do
       writeBinary outputFixedInputName $ BZ.toStrict . A.encode $ input
@@ -287,7 +287,7 @@ storeTemplateInFiles Template{..} folder = do
   relInputName <- case templateInput of
     Nothing -> return Nothing
     Just input -> do
-      let inputName = folder </> (templateName <> "_input") <.> "json"
+      let inputName = folder </> ("input" :: FilePath) <.> "json"
       writeBinary inputName $ BZ.toStrict $ A.encode input
       fmap Just $ relativeTo folder inputName
   let bodyName = folder </> templateName <.> "htex"

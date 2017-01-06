@@ -7,6 +7,9 @@ dependencies:
     name:  dep1
     input: dep1_input.json
     body:  dep1.htex
+    dependencies:
+      Helper.hs:
+        type: other
   dep2:
     type:  template
     name:  dep2

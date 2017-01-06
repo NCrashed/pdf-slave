@@ -6,3 +6,6 @@ dependencies:
     type:  template
     name:  dep1
     body:  dep1.htex
+    dependencies:
+      Helper.hs:
+        type: other

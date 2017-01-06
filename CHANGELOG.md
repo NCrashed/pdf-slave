@@ -1,3 +1,8 @@
+1.3.0.0
+=======
+
+* Default input file name is now `input.json`, not `<template name>_input.json`.
+
 1.2.3.0
 =======
 

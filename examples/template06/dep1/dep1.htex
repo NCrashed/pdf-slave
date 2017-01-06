@@ -3,8 +3,7 @@
 \end{haskellpragmas}
 \begin{writehaskell}
 import Data.Aeson
-import System.IO.Unsafe (unsafePerformIO)
-import qualified Data.ByteString.Lazy as BS
+import Helper
 
 import Text.LaTeX
 import Text.LaTeX.Packages.TikZ.Simple
@@ -26,10 +25,7 @@ instance FromJSON Input where
     <*> o .: "spiral-b" -- stop highlighting hell $
 
 inpt :: Input
-inpt = case unsafePerformIO $ fmap eitherDecode' $ BS.readFile "dep1_input.json" of
-  Left e -> error (show e)
-  Right a -> a
-
+inpt = defaultInput
 \end{writehaskell}
 
 Below is the \emph{Spira Mirabilis} inserted using the HaTeX

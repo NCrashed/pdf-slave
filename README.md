@@ -46,67 +46,87 @@ Common template consists of several files:
 
 * `template_input.json` - Input data for template in JSON format.
 
-``` JSON
-{
-  "line-width": 2,
-  "spiral-precision": 0.01,
-  "spiral-interval": [0,4],
-  "spiral-a": 0.1,
-  "spiral-b": 4
-}
-```
+  ``` JSON
+  {
+    "line-width": 2,
+    "spiral-precision": 0.01,
+    "spiral-interval": [0,4],
+    "spiral-a": 0.1,
+    "spiral-b": 4
+  }
+  ```
 
 * `template.htex` - TeX/LaTeX with embedded Haskell that reads input data from
 file `template.json`. You have to provide code at the beginning of file that reads
 the inputs, like that:
 
-``` Haskell
-\begin{document}
+  Make a `Helper.hs` file in directory with template:
+  ``` haskell
+  module Helper where
 
-\begin{haskellpragmas}
-{-# LANGUAGE OverloadedStrings #-}
-\end{haskellpragmas}
-\begin{writehaskell}
-import Data.Aeson
-import System.IO.Unsafe (unsafePerformIO)
-import qualified Data.ByteString.Lazy as BS
+  import qualified Data.ByteString.Lazy as BS
+  import Data.Aeson
+  import System.IO.Unsafe
 
-data Input = Input {
-  lineWidth       :: Double
-, spiralPrecision :: Double
-, spiralInterval  :: (Double, Double)
-, spiralA         :: Double
-, spiralB         :: Double
-}
+  defaultInput :: FromJSON a => a
+  {-# NOINLINE defaultInput #-}
+  defaultInput = case unsafePerformIO $ fmap eitherDecode' $ BS.readFile "input.json" of
+    Left e -> error (show e)
+    Right a -> a
+  ```
 
-instance FromJSON Input where
-  parseJSON (Object o) = Input
-    <$> o .: "line-width"
-    <*> o .: "spiral-precision"
-    <*> o .: "spiral-interval"
-    <*> o .: "spiral-a"
-    <*> o .: "spiral-b"
+  Next in your `.htex` file:
+  ``` Haskell
+  \begin{document}
 
-inpt :: Input
-inpt = case unsafePerformIO $ fmap eitherDecode' $ BS.readFile "template_input.json" of
-  Left e -> error (show e)
-  Right a -> a
+  \begin{haskellpragmas}
+  {-# LANGUAGE OverloadedStrings #-}
+  \end{haskellpragmas}
+  \begin{writehaskell}
+  import Data.Aeson
+  import Helper
 
-\end{writehaskell}
-```
+  data Input = Input {
+    lineWidth       :: Double
+  , spiralPrecision :: Double
+  , spiralInterval  :: (Double, Double)
+  , spiralA         :: Double
+  , spiralB         :: Double
+  }
 
-Note: The tool copies JSON with inputs to build folder with .htex twice, once with
-name specified at `input` key in template description and secondly at fixed `<template_name>_input.json`.
+  instance FromJSON Input where
+    parseJSON (Object o) = Input
+      <$> o .: "line-width"
+      <*> o .: "spiral-precision"
+      <*> o .: "spiral-interval"
+      <*> o .: "spiral-a"
+      <*> o .: "spiral-b"
+
+  inpt :: Input
+  inpt = defaultInput
+  \end{writehaskell}
+  ```
+
+  Note: The tool copies JSON with inputs to build folder with .htex twice, once with
+  name specified at `input` key in template description and secondly at fixed `input.json`.
 
 * `template.yaml` - description of template and its dependencies.
 
-``` YAML
-name:  template01             # name of template
-input: template01_input.json  # name of input file
-body:  template01.htex        # name of .htex file
-dependencies: {}              # dependency tree (see below)
-haskintex-opts: []            # additional flags to haskintex
-```
+  ``` YAML
+  name:  template01             # name of template
+  input: template01_input.json  # name of input file
+  body:  template01.htex        # name of .htex file
+  dependencies: {}              # dependency tree (see below)
+  haskintex-opts: []            # additional flags to haskintex
+  ```
+
+  For input `Helper.hs` you should make a record to inform `pdf-slave` that the module should be copied to build directory:
+
+  ``` YAML
+  dependencies:
+    Helper.hs:
+      type: other
+  ```
 
 ## Dependencies
 
@@ -310,3 +330,11 @@ Docker build
   ```
 
 3. Or download [precompiled container](https://hub.docker.com/r/ncrashed/pdf-slave/) from Docker Hub.
+
+
+Credits
+=======
+
+* Daniel Díaz - author of `haskintex` tool that is core of the package.
+
+* Alexander Vershilov aka qnikst - help with debugging and new `Helper.hs` module.

@@ -7,6 +7,9 @@ dependencies:
     name:  template01
     input: template01_input.json
     body:  template01.htex
+    dependencies:
+      Helper.hs:
+        type: other
   template02:
     type:  template_pdf
     name:  template02
