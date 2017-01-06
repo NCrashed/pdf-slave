@@ -33,13 +33,15 @@ data Command =
 -- | CLI options
 data Options = Options {
   -- | Path to template file, if missing, stdin is used
-  templatePath  :: Maybe FilePath
+  templatePath       :: Maybe FilePath
   -- | Path to output pdf file, if missing, stdout is used
-, pdfOutputPath :: Maybe FilePath
+, pdfOutputPath      :: Maybe FilePath
   -- | Path to JSON input file for overwritting input data of bundle
 , inputOverwritePath :: Maybe FilePath
+  -- | If the flag is set, temporary dirs won't be nuked after execution
+, preserveTempDirs   :: Bool
   -- | CLI action
-, cliCommand    ::  Command
+, cliCommand         :: Command
 }
 
 -- | Same as 'strOption' but parses Text
@@ -64,6 +66,10 @@ optionsParser = Options
     <> help ("You can specify JSON file as input that will overwrite default input"
       <> " for bundle or template input file" )
     <> metavar "INPUT_JSON_PATH"
+    )
+  <*> switch (
+       long "preserve-temp"
+    <> help "If the flag is set, temporary dirs won't be nuked after execution"
     )
   <*> commandParser
 
@@ -110,12 +116,12 @@ pdfSlave Options{..} = case cliCommand of
         bs <- case res of
           Left bundle -> do
             let bundle' = fromMaybe bundle $ (\i -> bundle { templateInput = i }) <$> optInput
-            renderBundleToPDF bundle'
+            renderBundleToPDF bundle' nuke
           Right template -> do
             inputOverwrite <- sequence $ fmap toTextWarn inputOverwritePath
             let template' = fromMaybe template $
                   (const $ template { templateFileInput = inputOverwrite }) <$> optInput
-            renderTemplateToPDF template' baseDir
+            renderTemplateToPDF template' baseDir nuke
         -- output results
         case pdfOutputPath of
           Nothing -> liftIO $ BS.putStr bs
@@ -150,6 +156,8 @@ pdfSlave Options{..} = case cliCommand of
             outputFolder' <- toTextWarn outputFolder
             echo $ "Bundle is unpacked to " <> outputFolder'
       _ -> return ()
+
+  nuke = not preserveTempDirs
 
 main :: IO ()
 main = execParser opts >>= pdfSlave

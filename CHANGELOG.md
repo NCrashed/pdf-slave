@@ -3,6 +3,10 @@
 
 * Default input file name is now `input.json`, not `<template name>_input.json`.
 
+* Changed recommended way of reading input via `Helper.hs`
+
+* Added flag `preserve-temp` to not nuke temporary files after execution.
+
 1.2.3.0
 =======
 

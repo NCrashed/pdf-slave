@@ -20,18 +20,24 @@ module Text.PDF.Slave.Render(
   , parseBundleOrTemplateFromFile
   ) where
 
+import Control.Concurrent
 import Control.Monad (join, forM_)
 import Control.Monad.Catch
 import Data.Aeson (Value(..))
 import Data.ByteString (ByteString)
+import Data.Char
 import Data.Maybe (fromMaybe)
 import Data.Monoid
 import Data.Set (Set)
 import Data.Yaml (ParseException, decodeEither')
 import Filesystem.Path (dropExtension, directory)
+import Filesystem.Path.CurrentOS (decodeString)
 import GHC.Generics
 import Prelude hiding (FilePath)
 import Shelly
+import System.IO (hClose, openTempFile)
+
+import System.Directory (getTemporaryDirectory)
 
 import qualified Data.Aeson as A
 import qualified Data.ByteString.Lazy as BZ
@@ -73,15 +79,16 @@ displayPDFRenderException e = case e of
 renderBundleOrTemplateFromFile ::
      FilePath -- ^ Path to either bundle 'Template' or template 'TemplateFile'
   -> Maybe Value -- ^ Overwrite of input JSON for bundle
+  -> Bool -- ^ Nuke temp folder?
   -> Sh PDFContent
-renderBundleOrTemplateFromFile filename bundleInput = do
+renderBundleOrTemplateFromFile filename bundleInput nuke = do
   res <- parseBundleOrTemplateFromFile filename
   let baseDir = directory filename
   case res of
     Left bundle -> do
       let bundle' = fromMaybe bundle $ fmap (\i -> bundle { templateInput = Just i }) bundleInput
-      renderBundleToPDF bundle'
-    Right template -> renderTemplateToPDF template baseDir
+      renderBundleToPDF bundle' nuke
+    Right template -> renderTemplateToPDF template baseDir nuke
 
 -- | Try to parse either a bundle or template file
 parseBundleOrTemplateFromFile :: FilePath -- ^ Path to either 'Template' or 'TemplateFile'
@@ -102,36 +109,40 @@ parseBundleOrTemplate filename cnt = case decodeEither' cnt of
 -- | Helper to render from all-in bundle template
 renderFromFileBundleToPDF :: FilePath -- ^ Path to 'Template' all-in bundle
   -> Maybe Value -- ^ Overwrite of input JSON for bundle
+  -> Bool -- ^ Nuke temp folder?
   -> Sh PDFContent
-renderFromFileBundleToPDF filename bundleInput = do
+renderFromFileBundleToPDF filename bundleInput nuke = do
   cnt <- readBinary filename
   case decodeEither' cnt of
     Left e -> throwM $ BundleFormatError filename e
     Right bundle -> do
       let bundle' = fromMaybe bundle $ fmap (\i -> bundle { templateInput = Just i }) bundleInput
-      renderBundleToPDF bundle'
+      renderBundleToPDF bundle' nuke
 
 -- | Helper to render from template file
 renderFromFileToPDF :: FilePath -- ^ Path to 'TemplateFile'
+  -> Bool -- ^ Nuke temp folder?
   -> Sh PDFContent
-renderFromFileToPDF filename = do
+renderFromFileToPDF filename nuke = do
   cnt <- readBinary filename
   case decodeEither' cnt of
     Left e -> throwM $ TemplateFormatError filename e
-    Right template -> renderTemplateToPDF template (directory filename)
+    Right template -> renderTemplateToPDF template (directory filename) nuke
 
 -- | Unpack bundle, render the template, cleanup and return PDF
 renderBundleToPDF :: Template -- ^ Input all-in template
+  -> Bool -- ^ Nuke temp folder?
   -> Sh PDFContent
-renderBundleToPDF bundle = withTmpDir $ \unpackDir -> do
+renderBundleToPDF bundle nuke = withTmpDir' nuke $ \unpackDir -> do
   template <- storeTemplateInFiles bundle unpackDir
-  renderTemplateToPDF template unpackDir
+  renderTemplateToPDF template unpackDir nuke
 
 -- | Render template and return content of resulted PDF file
 renderTemplateToPDF :: TemplateFile -- ^ Input template
   -> FilePath -- ^ Base directory
+  -> Bool -- ^ Nuke temp folder?
   -> Sh PDFContent -- ^ Output PDF file
-renderTemplateToPDF t@TemplateFile{..} baseDir = withTmpDir $ \outputFolder -> do
+renderTemplateToPDF t@TemplateFile{..} baseDir nuke = withTmpDir' nuke $ \outputFolder -> do
   -- Parse global input file and pass it as inherited input
   minput <- case templateFileInput of
     Nothing -> return Nothing
@@ -324,3 +335,19 @@ storeTemplateInFiles Template{..} folder = do
         mkdir_p $ directory bodyName
         writeBinary bodyName body
         return OtherDepFile
+
+-- | Create a temporary directory and pass it as a parameter to a Sh
+-- computation. The directory is nuked afterwards if first parameter is 'True'.
+withTmpDir' :: Bool -> (FilePath -> Sh a) -> Sh a
+withTmpDir' nuke act = do
+  trace "withTmpDir"
+  dir <- liftIO getTemporaryDirectory
+  tid <- liftIO myThreadId
+  (pS, fhandle) <- liftIO $ openTempFile dir ("tmp" ++ filter isAlphaNum (show tid))
+  let p = decodeString pS
+  liftIO $ hClose fhandle -- required on windows
+  rm_f p
+  mkdir p
+  if nuke
+    then act p `finally_sh` rm_rf p
+    else act p
