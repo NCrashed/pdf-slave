@@ -1,3 +1,8 @@
+1.3.1.0
+=======
+
+* Added flag `json` to output bundles in JSON format instead of YAML.
+
 1.3.0.0
 =======
 
