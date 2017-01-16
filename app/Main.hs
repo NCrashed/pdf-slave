@@ -40,6 +40,8 @@ data Options = Options {
 , inputOverwritePath :: Maybe FilePath
   -- | If the flag is set, temporary dirs won't be nuked after execution
 , preserveTempDirs   :: Bool
+  -- | Store bundle in JSON format instead of YAML
+, outputBundleJson   :: Bool
   -- | CLI action
 , cliCommand         :: Command
 }
@@ -70,6 +72,10 @@ optionsParser = Options
   <*> switch (
        long "preserve-temp"
     <> help "If the flag is set, temporary dirs won't be nuked after execution"
+    )
+  <*> switch (
+       long "json"
+    <> help "Store bundle in JSON format instead of YAML"
     )
   <*> commandParser
 
@@ -135,7 +141,7 @@ pdfSlave Options{..} = case cliCommand of
           case res of
             Left e -> fail $ "Failed to pack bundle: " <> show e
             Right t -> do
-              let bs = encode t
+              let bs = if outputBundleJson then BZ.toStrict $ A.encode t else encode t
               case pdfOutputPath of
                 Nothing -> liftIO $ BS.putStr bs
                 Just outputPath -> do
