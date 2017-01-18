@@ -2,3 +2,6 @@
 pdf-slave.sublime-workspace
 examples/*/*.pdf
 artifacts
+ubuntu/data/usr
+ubuntu/data/var
+pdf-slave-server*.deb
