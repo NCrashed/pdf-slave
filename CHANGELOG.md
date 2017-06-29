@@ -1,3 +1,8 @@
+1.3.2.0
+=======
+
+* Relax `aeson`, `directory` and `opt-parse-applicative` bounds.
+
 1.3.1.0
 =======
 

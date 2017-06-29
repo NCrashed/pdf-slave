@@ -15,7 +15,7 @@
 # resolver:
 #  name: custom-snapshot
 #  location: "./custom-snapshot.yaml"
-resolver: lts-7.16
+resolver: lts-8.19
 
 # User packages to be built.
 # Various formats can be used as shown in the example below.
@@ -40,7 +40,7 @@ packages:
 - 'pdf-slave-template'
 - location:
     git: https://github.com/NCrashed/haskintex.git
-    commit: b100ebf945f4ee9f28c5a2424e46f718f46a1e30
+    commit: ebbc70b803b51e52cfc4433338516cdbb2998e13
   extra-dep: true
 
 # Dependency packages to be pulled from upstream that are not in the resolver
